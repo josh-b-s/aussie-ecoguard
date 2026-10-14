@@ -1,0 +1,86 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: EcoGuard Backend APIs - Member 3
+
+Parameters:
+  ExistingTableName:
+    Type: String
+    Default: ecoguard-pipeline-FilesTable-7T9WJ72MHXFO
+
+  ExistingBucketName:
+    Type: String
+    Default: ecoguard-media-853611856490
+
+  UserPoolArn:
+    Type: String
+    Default: arn:aws:cognito-idp:ap-southeast-2:853611856490:userpool/ap-southeast-2_WI1ngaH1k
+
+  FrontendOrigin:
+    Type: String
+    Default: http://localhost:5173
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [x86_64]
+    Environment:
+      Variables:
+        TABLE: !Ref ExistingTableName
+        BUCKET: !Ref ExistingBucketName
+
+Resources:
+  BackendApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowOrigin: !Sub "'${FrontendOrigin}'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'POST,OPTIONS'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !Ref UserPoolArn
+
+  SearchTagsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Search completed media by species and minimum counts
+      CodeUri: search_tags/
+      Handler: handler.handler
+      Timeout: 30
+      MemorySize: 256
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/uploads/*"
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/thumbnails/*"
+      Events:
+        SearchTags:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/search/tags
+            Method: post
+
+Outputs:
+  BackendApiUrl:
+    Description: URL for Member 3 backend APIs
+    Value: !Sub "https://${BackendApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+
+  TableName:
+    Value: !Ref ExistingTableName
+
+  BucketName:
+    Value: !Ref ExistingBucketName
