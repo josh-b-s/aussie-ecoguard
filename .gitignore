@@ -1,0 +1,40 @@
+# Secrets (never commit these)
+.env
+.env.*
+*.pem
+*.key
+*credentials*.json
+*service-account*.json
+.aws/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+
+# Build artifacts and packaging
+*.zip
+.aws-sam/
+.serverless/
+
+# Large media / model files (use S3 or Cloud Storage instead)
+*.mp4
+*.mov
+*.pt
+*.onnx
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
