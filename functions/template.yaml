@@ -1,0 +1,213 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: EcoGuard file processing (upload init, thumbnails, tagging)
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Globally unique name for the media bucket
+  UserPoolArn:
+    Type: String
+    Description: ARN of the Cognito user pool that signs users in
+  FrontendOrigin:
+    Type: String
+    Default: http://localhost:5173
+  ConfigParamName:
+    Type: String
+    Default: /ecoguard/model-config
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [x86_64]
+    Environment:
+      Variables:
+        TABLE: !Ref FilesTable
+
+Resources:
+  FilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+
+  # S3 allows only one notification per prefix and event type, so uploads fan out through SNS
+  UploadsTopic:
+    Type: AWS::SNS::Topic
+
+  UploadsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref UploadsTopic]
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref UploadsTopic
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub "arn:aws:s3:::${BucketName}"
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: UploadsTopicPolicy
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref FrontendOrigin]
+            AllowedMethods: [GET, PUT, HEAD]
+            AllowedHeaders: ["*"]
+            ExposedHeaders: [ETag]
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Event: s3:ObjectCreated:*
+            Topic: !Ref UploadsTopic
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+
+  ModelConfig:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref ConfigParamName
+      Type: String
+      Value: |
+        {
+          "min_confidence": 70,
+          "label_map": {
+            "Fox": "fox", "Cat": "cat", "Dog": "dog", "Rabbit": "rabbit",
+            "Pig": "feral pig", "Toad": "cane toad"
+          }
+        }
+
+  OpenCvLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: ecoguard-opencv
+      ContentUri: layers/opencv/
+      CompatibleRuntimes: [python3.12]
+      CompatibleArchitectures: [x86_64]
+
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowOrigin: !Sub "'${FrontendOrigin}'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'POST,OPTIONS'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !Ref UserPoolArn
+
+  UploadInitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: upload_init/
+      Handler: handler.handler
+      Timeout: 10
+      Environment:
+        Variables:
+          BUCKET: !Ref BucketName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${BucketName}/uploads/*"
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt FilesTable.Arn
+      Events:
+        Init:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /upload/init
+            Method: post
+
+  ThumbnailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: thumbnailer/
+      Handler: handler.handler
+      Timeout: 30
+      MemorySize: 512
+      Layers: [!Ref OpenCvLayer]
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${BucketName}/uploads/*"
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${BucketName}/thumbnails/*"
+            - Effect: Allow
+              Action: dynamodb:UpdateItem
+              Resource: !GetAtt FilesTable.Arn
+      Events:
+        Uploaded:
+          Type: SNS
+          Properties:
+            Topic: !Ref UploadsTopic
+
+  TaggerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: tagger/
+      Handler: handler.handler
+      Timeout: 120
+      MemorySize: 1024
+      EphemeralStorage:
+        Size: 2048
+      Layers: [!Ref OpenCvLayer]
+      Environment:
+        Variables:
+          CONFIG_PARAM: !Ref ConfigParamName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${BucketName}/uploads/*"
+            - Effect: Allow
+              Action: dynamodb:UpdateItem
+              Resource: !GetAtt FilesTable.Arn
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ConfigParamName}"
+            # DetectLabels does not support resource-level permissions
+            - Effect: Allow
+              Action: rekognition:DetectLabels
+              Resource: "*"
+      Events:
+        Uploaded:
+          Type: SNS
+          Properties:
+            Topic: !Ref UploadsTopic
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  BucketName:
+    Value: !Ref MediaBucket
+  TableName:
+    Value: !Ref FilesTable

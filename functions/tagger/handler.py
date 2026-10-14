@@ -1,11 +1,11 @@
 import os
-from urllib.parse import unquote_plus
 
 import boto3
 
 import file_table
 from config import load_config
 from detect import detect_tags, merge_max
+from events import uploaded_objects
 from frames import extract_frames
 
 VIDEO_EXTENSIONS = {".mp4"}
@@ -33,9 +33,7 @@ def tag_video(bucket, key, config):
 
 def handler(event, context):
     config = load_config()
-    for record in event["Records"]:
-        bucket = record["s3"]["bucket"]["name"]
-        key = unquote_plus(record["s3"]["object"]["key"])
+    for bucket, key in uploaded_objects(event):
         file_id, ext = os.path.splitext(os.path.basename(key))
 
         try:
