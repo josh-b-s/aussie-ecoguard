@@ -8,7 +8,7 @@ Parameters:
     Description: Globally unique name for the media bucket
   UserPoolArn:
     Type: String
-    Description: ARN of the Cognito user pool that signs users in
+    Default: arn:aws:cognito-idp:ap-southeast-2:853611856490:userpool/ap-southeast-2_WI1ngaH1k
   FrontendOrigin:
     Type: String
     Default: http://localhost:5173
@@ -25,6 +25,16 @@ Globals:
         TABLE: !Ref FilesTable
 
 Resources:
+  BackendApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !Ref UserPoolArn
   FilesTable:
     Type: AWS::DynamoDB::Table
     Properties:
