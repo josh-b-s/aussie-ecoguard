@@ -207,6 +207,7 @@ Resources:
   SearchTagsFunction:
     Type: AWS::Serverless::Function
     Properties:
+      Description: Search completed media by species tags and minimum counts
       CodeUri: search_tags/
       Handler: handler.handler
       Timeout: 30
