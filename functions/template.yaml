@@ -203,6 +203,37 @@ Resources:
           Type: SNS
           Properties:
             Topic: !Ref UploadsTopic
+  
+  SearchTagsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: search_tags/
+      Handler: handler.handler
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          BUCKET: !Ref BucketName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !GetAtt FilesTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${BucketName}/uploads/*"
+                - !Sub "arn:aws:s3:::${BucketName}/thumbnails/*"
+      Events:
+        SearchTags:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /media/search/tags
+            Method: post
+
 
 Outputs:
   ApiUrl:
