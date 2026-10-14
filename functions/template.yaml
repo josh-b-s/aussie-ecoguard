@@ -25,16 +25,6 @@ Globals:
         TABLE: !Ref FilesTable
 
 Resources:
-  BackendApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: prod
-      Auth:
-        DefaultAuthorizer: CognitoAuthorizer
-        AddDefaultAuthorizerToCorsPreflight: false
-        Authorizers:
-          CognitoAuthorizer:
-            UserPoolArn: !Ref UserPoolArn
   FilesTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -213,37 +203,6 @@ Resources:
           Type: SNS
           Properties:
             Topic: !Ref UploadsTopic
-  
-  SearchTagsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Description: Search completed media by species tags and minimum counts
-      CodeUri: search_tags/
-      Handler: handler.handler
-      Timeout: 30
-      MemorySize: 256
-      Environment:
-        Variables:
-          BUCKET: !Ref BucketName
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Scan
-              Resource: !GetAtt FilesTable.Arn
-            - Effect: Allow
-              Action:
-                - s3:GetObject
-              Resource:
-                - !Sub "arn:aws:s3:::${BucketName}/uploads/*"
-                - !Sub "arn:aws:s3:::${BucketName}/thumbnails/*"
-      Events:
-        SearchTags:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /media/search/tags
-            Method: post
 
 
 Outputs:
