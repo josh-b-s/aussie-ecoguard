@@ -15,9 +15,9 @@ pip install -r requirements.txt pytest httpx
 pytest -q
 ```
 
-## Deploy (GCP project fit3184-504001)
+## Deploy (GCP project ecoguard-g11-14145)
 ```
-gcloud config set project fit3184-504001
+gcloud config set project ecoguard-g11-14145
 gcloud run deploy ecoguard-api \
   --source . \
   --region australia-southeast1 \
