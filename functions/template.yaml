@@ -90,11 +90,13 @@ Resources:
       Type: String
       Value: |
         {
-          "min_confidence": 70,
+          "min_confidence": 85,
           "label_map": {
             "Fox": "fox", "Cat": "cat", "Dog": "dog", "Rabbit": "rabbit",
-            "Pig": "feral pig", "Toad": "cane toad"
-          }
+            "Pig": "feral pig", "Boar": "feral pig", "Hog": "feral pig",
+            "Toad": "cane toad"
+          },
+          "drop_if_present": {"dog": ["fox"], "cat": ["fox"]}
         }
 
   OpenCvLayer:
