@@ -24,18 +24,37 @@ def json_converter(value):
     raise TypeError(f"Cannot serialize {type(value).__name__}")
 
 
+FRONTEND_ORIGIN = os.environ.get(
+    "FRONTEND_ORIGIN",
+    "http://localhost:5173"
+)
+
 def response(status, body):
     return {
         "statusCode": status,
         "headers": {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": FRONTEND_ORIGIN,
+            "Vary": "Origin"
         },
         "body": json.dumps(body, default=json_converter)
     }
 
-
 def handler(event, context):
     try:
+        claims = (
+            (event.get("requestContext") or {})
+            .get("authorizer", {})
+            .get("claims", {})
+        )
+
+        user_sub = claims.get("sub")
+
+        if not user_sub:
+            return response(401, {
+                "error": "Authentication required."
+            })
+
         body = json.loads(event.get("body") or "{}")
 
         if not isinstance(body, dict):
@@ -71,9 +90,11 @@ def handler(event, context):
                 if item.get("status") != "done":
                     continue
 
-                # Enable after agreeing on visibility rules:
-                # if item.get("visibility") != "public":
-                #     continue
+                is_owner = item.get("uploaded_by") == user_sub
+                is_public = item.get("visibility") == "public"
+
+                if not (is_owner or is_public):
+                    continue
 
                 stored_tags = item.get("tags") or {}
 
@@ -131,7 +152,7 @@ def handler(event, context):
             "total": len(results)
         })
 
-    except (ValueError, TypeError, json.JSONDecodeError):
+    except (ValueError, TypeError):
         return response(400, {
             "error": "Invalid JSON request."
         })

@@ -19,7 +19,7 @@ Parameters:
 
   FrontendOrigin:
     Type: String
-    Default: http://localhost:5173
+    Default: "http://localhost:5173"
 
 Globals:
   Function:
@@ -54,6 +54,9 @@ Resources:
       Handler: handler.handler
       Timeout: 30
       MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
       Policies:
         - Statement:
             - Effect: Allow
