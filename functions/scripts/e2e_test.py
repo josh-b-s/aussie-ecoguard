@@ -14,7 +14,13 @@ from pathlib import Path
 
 import boto3
 
-CONTENT_TYPES = {".jpg": "image/jpeg", ".png": "image/png", ".mp4": "video/mp4"}
+CONTENT_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+}
 POLL_SECONDS = 120
 
 

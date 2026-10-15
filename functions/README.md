@@ -22,7 +22,7 @@ scripts/e2e_test.py  uploads one file and prints the resulting record
 5. The thumbnailer writes `thumbnails/<sha256>.jpg` and sets `thumbnail_key` on the record (images only).
 6. The tagger detects species, then sets `tags` and `status: done` on the record. On any error it sets `status: failed` and re-raises.
 
-Accepted types: `image/jpeg`, `image/png`, `video/mp4`.
+Accepted types: `image/jpeg`, `image/png`, `video/mp4`, `video/quicktime`. Rekognition reads only JPEG and PNG, so other image formats (WebP, GIF) are rejected at init. The stored key extension follows the content type, so a `.jpeg` file sent as `image/jpeg` is stored as `.jpg`.
 
 ### Upload init API
 

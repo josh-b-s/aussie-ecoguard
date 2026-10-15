@@ -14,6 +14,7 @@ ALLOWED_TYPES = {
     "image/jpeg": ("jpg", "image"),
     "image/png": ("png", "image"),
     "video/mp4": ("mp4", "video"),
+    "video/quicktime": ("mov", "video"),
 }
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 

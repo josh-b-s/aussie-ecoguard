@@ -8,7 +8,7 @@ from detect import detect_tags, merge_max
 from events import uploaded_objects
 from frames import extract_frames
 
-VIDEO_EXTENSIONS = {".mp4"}
+VIDEO_EXTENSIONS = {".mp4", ".mov"}
 
 s3 = boto3.client("s3")
 
