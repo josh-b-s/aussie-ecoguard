@@ -134,7 +134,7 @@ Each function has its own role:
 ## Known limits
 
 - Dedup uses the hash the client sends. The server does not recompute it, so a client can claim a hash that does not match the bytes.
-- Init treats any existing record as a duplicate, including `pending` and `failed` ones. A failed upload cannot be retried with the same file until its record is removed.
+- Init replaces a record that is `failed`, or `pending` for more than 10 minutes, so an abandoned or failed upload can be retried. The retrying user becomes the owner of the new record.
 - Rekognition cannot tell a cane toad from other toads, or a feral cat from a pet cat.
 - Other animals in frame add to the count of a single detected species.
 - Rekognition rejects frame images over 5 MB. Very high resolution video may need downscaling in `tagger/frames.py`.
