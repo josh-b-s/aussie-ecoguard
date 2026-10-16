@@ -31,6 +31,7 @@ Globals:
         BUCKET: !Ref ExistingBucketName
 
 Resources:
+# Existing API Gateway configuration
   BackendApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -46,6 +47,7 @@ Resources:
           CognitoAuthorizer:
             UserPoolArn: !Ref UserPoolArn
 
+  # Existing Search by Tags Lambda
   SearchTagsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -77,7 +79,38 @@ Resources:
             Path: /media/search/tags
             Method: post
 
+   # New Search by Thumbnail Lambda
+  SearchThumbnailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Find original image using thumbnail URL
+      CodeUri: search_thumbnail/
+      Handler: handler.handler
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${ExistingBucketName}/uploads/*"
+      Events:
+        SearchThumbnail:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/search/thumbnail
+            Method: post
+
 Outputs:
+  # Existing output
   BackendApiUrl:
     Description: URL for Member 3 backend APIs
     Value: !Sub "https://${BackendApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
