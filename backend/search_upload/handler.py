@@ -47,3 +47,48 @@ def response(status, body):
         },
         "body": json.dumps(body, default=json_converter)
     }
+
+
+def detect_tags(image_key):
+    """Invoke Josh's image detection Lambda."""
+
+    result = lambda_client.invoke(
+        FunctionName=DETECT_FUNCTION,
+        InvocationType="RequestResponse",
+        Payload=json.dumps({
+            "key": image_key
+        }).encode("utf-8")
+    )
+
+    if result.get("FunctionError"):
+        logger.error(
+            "Detection Lambda failed: %s",
+            result["FunctionError"]
+        )
+        raise RuntimeError("Image detection failed.")
+
+    if result.get("StatusCode") != 200:
+        raise RuntimeError("Image detection invocation failed.")
+
+    payload = json.loads(
+        result["Payload"].read().decode("utf-8")
+    )
+
+    if not isinstance(payload, dict):
+        raise RuntimeError("Invalid detection response.")
+
+    tags = payload.get("tags")
+
+    if not isinstance(tags, dict):
+        raise RuntimeError("Detection response has no valid tags.")
+
+    for tag, count in tags.items():
+        if (
+            not isinstance(tag, str)
+            or not tag.strip()
+            or type(count) is not int
+            or count < 1
+        ):
+            raise RuntimeError("Invalid detected tag counts.")
+
+    return tags
