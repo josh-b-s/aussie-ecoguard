@@ -2,6 +2,7 @@
 import json
 import os
 import logging
+import time
 import boto3
 from decimal import Decimal
 
@@ -13,6 +14,7 @@ s3 = boto3.client("s3")
 lambda_client = boto3.client("lambda")
 
 table = dynamodb.Table(os.environ["TABLE"])
+temp_table = dynamodb.Table(os.environ["TEMP_TABLE"])
 BUCKET = os.environ["BUCKET"]
 
 DETECT_FUNCTION = os.environ.get(
@@ -92,3 +94,27 @@ def detect_tags(image_key):
             raise RuntimeError("Invalid detected tag counts.")
 
     return tags
+
+def verify_upload(image_key, user_sub):
+    """Verify that this temporary image belongs to the user."""
+
+    if not isinstance(image_key, str):
+        return False
+
+    if not image_key.startswith("search-temp/"):
+        return False
+
+    record = temp_table.get_item(
+        Key={"image_key": image_key}
+    ).get("Item")
+
+    if not record:
+        return False
+
+    if record.get("uploaded_by") != user_sub:
+        return False
+
+    if int(record.get("expires_at", 0)) <= int(time.time()):
+        return False
+
+    return True
