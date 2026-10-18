@@ -123,6 +123,7 @@ Resources:
         AttributeName: expires_at
         Enabled: true
   
+ 
   SearchUploadInitFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -134,12 +135,17 @@ Resources:
       Environment:
         Variables:
           FRONTEND_ORIGIN: !Ref FrontendOrigin
+          TEMP_TABLE: !Ref SearchTempTable
       Policies:
         - Statement:
             - Effect: Allow
               Action:
                 - s3:PutObject
               Resource: !Sub "arn:aws:s3:::${ExistingBucketName}/search-temp/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt SearchTempTable.Arn
       Events:
         SearchUploadInit:
           Type: Api
