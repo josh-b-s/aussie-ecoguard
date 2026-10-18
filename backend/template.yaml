@@ -108,6 +108,31 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/search/thumbnail
             Method: post
+  
+  SearchUploadInitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Generate temporary image upload URLs for search
+      CodeUri: search_upload_init/
+      Handler: handler.handler
+      Timeout: 15
+      MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${ExistingBucketName}/search-temp/*"
+      Events:
+        SearchUploadInit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/search/upload/init
+            Method: post
 
 Outputs:
   # Existing output
