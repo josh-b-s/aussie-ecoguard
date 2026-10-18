@@ -3,13 +3,15 @@ import json
 import logging
 import os
 import uuid
-
+import time
 import boto3
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
+dynamodb = boto3.resource("dynamodb")
+temp_table = dynamodb.Table(os.environ["TEMP_TABLE"])
 
 BUCKET = os.environ["BUCKET"]
 FRONTEND_ORIGIN = os.environ.get(
@@ -82,6 +84,14 @@ def handler(event, context):
                 "ContentType": content_type
             },
             ExpiresIn=300
+        )
+        
+        temp_table.put_item(
+            Item={
+                "image_key": image_key,
+                "uploaded_by": user_sub,
+                "expires_at": int(time.time()) + 3600
+            }
         )
 
         return response(200, {
