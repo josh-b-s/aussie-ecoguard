@@ -86,13 +86,16 @@ def handler(event, context):
             ExpiresIn=300
         )
         
+        
         temp_table.put_item(
             Item={
                 "image_key": image_key,
                 "uploaded_by": user_sub,
                 "expires_at": int(time.time()) + 3600
-            }
+            },
+            ConditionExpression="attribute_not_exists(image_key)"
         )
+
 
         return response(200, {
             "uploadUrl": upload_url,
