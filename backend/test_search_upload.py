@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 def test_search_upload_requires_authentication():
     handler_path = (
-        Path(__file__).resolve().parents[1]
-        / "search_upload"
-        / "handler.py"
+    Path(__file__).resolve().parent
+    / "search_upload"
+    / "handler.py"
     )
 
     with patch.dict(os.environ, {
