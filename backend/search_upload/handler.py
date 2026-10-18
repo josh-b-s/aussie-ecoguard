@@ -121,6 +121,36 @@ def verify_upload(image_key, user_sub):
     return True
 
 
+def claim_upload(image_key, user_sub):
+    """Allow only one search attempt per upload session."""
+
+    try:
+        temp_table.update_item(
+            Key={"image_key": image_key},
+            UpdateExpression="SET #state = :used",
+            ConditionExpression=(
+                "attribute_exists(image_key) "
+                "AND uploaded_by = :owner "
+                "AND expires_at > :now "
+                "AND attribute_not_exists(#state)"
+            ),
+            ExpressionAttributeNames={
+                "#state": "state"
+            },
+            ExpressionAttributeValues={
+                ":used": "used",
+                ":owner": user_sub,
+                ":now": int(time.time())
+            }
+        )
+        return True
+
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            return False
+        raise
+
+
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 ALLOWED_IMAGE_TYPES = {
@@ -216,6 +246,11 @@ def handler(event, context):
         if not valid:
             return response(400, {
                 "error": error_message
+            })
+
+        if not claim_upload(image_key, user_sub):
+            return response(409, {
+                "error": "Upload has already been used or has expired."
             })
 
         try:
