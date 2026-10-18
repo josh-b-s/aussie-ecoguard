@@ -9,6 +9,7 @@ template.yaml        bucket, table, topic, API, Lambdas, roles, layer, model con
 upload_init/         POST /upload/init: dedup check and presigned upload URL
 thumbnailer/         resizes images into thumbnails
 tagger/              runs Rekognition, extracts video frames, saves tags
+                     (query_handler.py is the separate query-time detect Lambda)
 layers/              script that builds the OpenCV layer
 scripts/e2e_test.py  uploads one file and prints the resulting record
 ```
@@ -62,6 +63,20 @@ Only S3 keys are stored. Build URLs when responding (presigned GET). The bucket 
 - Images go to Rekognition `DetectLabels` by S3 reference.
 - Videos are downloaded to `/tmp` and one frame is taken every 10 seconds, starting at 0 s, with OpenCV. Each frame is detected separately and results are merged by taking the highest count per tag.
 - Rekognition's species labels are reliable but the labels on its bounding boxes are not (a photo of foxes can come back with boxes labelled Dog, Cat and Pig). The tagger therefore reads species from the image-level labels and counts every box whose label has `Animal` as a parent. When one species is present it gets that total. When several are present each gets its own boxes, which can undercount.
+
+### Detecting a query image
+
+The search API tags a temporary query image through `ecoguard-detect`, which uses the same detection code and model config as the tagger. Invoke it synchronously:
+
+```python
+lambda_client.invoke(FunctionName="ecoguard-detect", Payload=json.dumps({"key": "search-temp/<id>.jpg"}))
+```
+
+Response payload: `{"tags": {"fox": 2}}`. Images only (JPEG or PNG). The key must start with `search-temp/`, the function reads only that prefix, and objects there expire after 1 day. Nothing under `search-temp/` triggers the upload pipeline or creates a record. The caller needs `lambda:InvokeFunction` on the function's ARN (stack output `DetectFunctionArn`).
+
+### Table stream
+
+`FilesTable` has a DynamoDB stream with old and new images (stack output `FilesTableStreamArn`). A record goes `pending` to `done` when the tagger saves tags, and the thumbnailer updates the same record separately, so a consumer should act when the old status is not `done` and the new status is.
 
 ### Model config
 
