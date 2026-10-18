@@ -175,7 +175,8 @@ Resources:
               Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
             - Effect: Allow
               Action:
-                - dynamodb:GetItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
               Resource: !GetAtt SearchTempTable.Arn
             - Effect: Allow
               Action:
