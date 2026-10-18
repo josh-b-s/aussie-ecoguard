@@ -170,3 +170,147 @@ def validate_uploaded_image(image_key):
         return False, "Image content does not match its declared type."
 
     return True, None
+
+
+def handler(event, context):
+    try:
+        claims = (
+            (event.get("requestContext") or {})
+            .get("authorizer", {})
+            .get("claims", {})
+        )
+
+        user_sub = claims.get("sub")
+
+        if not user_sub:
+            return response(401, {
+                "error": "Authentication required."
+            })
+
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except (ValueError, TypeError):
+            return response(400, {
+                "error": "Invalid JSON request."
+            })
+
+        if not isinstance(body, dict):
+            return response(400, {
+                "error": "Request body must be a JSON object."
+            })
+
+        image_key = body.get("imageKey")
+
+        if not isinstance(image_key, str):
+            return response(400, {
+                "error": "imageKey must be a string."
+            })
+
+        if not verify_upload(image_key, user_sub):
+            return response(403, {
+                "error": "Upload not found, expired, or unauthorized."
+            })
+
+        valid, error_message = validate_uploaded_image(image_key)
+
+        if not valid:
+            return response(400, {
+                "error": error_message
+            })
+
+        try:
+            detected_tags = detect_tags(image_key)
+        except Exception:
+            logger.exception("Image detection failed")
+            return response(502, {
+                "error": "Image detection service failed."
+            })
+
+        if not detected_tags:
+            return response(200, {
+                "detected_tags": {},
+                "results": [],
+                "total": 0
+            })
+
+        results = []
+        scan_args = {}
+
+        while True:
+            page = table.scan(**scan_args)
+
+            for item in page.get("Items", []):
+                if item.get("status") != "done":
+                    continue
+
+                is_owner = item.get("uploaded_by") == user_sub
+                is_public = item.get("visibility") == "public"
+
+                if not (is_owner or is_public):
+                    continue
+
+                stored_tags = item.get("tags") or {}
+
+                if not isinstance(stored_tags, dict):
+                    continue
+
+                matches = all(
+                    isinstance(stored_tags.get(tag), (int, Decimal))
+                    and stored_tags[tag] >= count
+                    for tag, count in detected_tags.items()
+                )
+
+                if not matches:
+                    continue
+
+                result = {
+                    "file_id": item["file_id"],
+                    "file_type": item.get("file_type"),
+                    "tags": stored_tags
+                }
+
+                original_key = item.get("original_key")
+
+                if original_key:
+                    result["original_url"] = s3.generate_presigned_url(
+                        "get_object",
+                        Params={
+                            "Bucket": BUCKET,
+                            "Key": original_key
+                        },
+                        ExpiresIn=900
+                    )
+
+                thumbnail_key = item.get("thumbnail_key")
+
+                if thumbnail_key:
+                    result["thumbnail_url"] = s3.generate_presigned_url(
+                        "get_object",
+                        Params={
+                            "Bucket": BUCKET,
+                            "Key": thumbnail_key
+                        },
+                        ExpiresIn=900
+                    )
+
+                results.append(result)
+
+            last_key = page.get("LastEvaluatedKey")
+
+            if not last_key:
+                break
+
+            scan_args["ExclusiveStartKey"] = last_key
+
+        return response(200, {
+            "detected_tags": detected_tags,
+            "results": results,
+            "total": len(results)
+        })
+
+    except Exception:
+        logger.exception("SearchUploadFunction failed")
+        return response(500, {
+            "error": "Internal server error."
+        })
+
