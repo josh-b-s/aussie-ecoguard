@@ -8,7 +8,7 @@ Parameters:
     Description: Globally unique name for the media bucket
   UserPoolArn:
     Type: String
-    Default: arn:aws:cognito-idp:ap-southeast-2:853611856490:userpool/ap-southeast-2_WI1ngaH1k
+    Description: ARN of the Cognito user pool that signs users in
   FrontendOrigin:
     Type: String
     Default: http://localhost:5173
@@ -29,6 +29,8 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
       AttributeDefinitions:
         - AttributeName: file_id
           AttributeType: S
@@ -73,6 +75,12 @@ Resources:
             AllowedMethods: [GET, PUT, HEAD]
             AllowedHeaders: ["*"]
             ExposedHeaders: [ETag]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-search-temp
+            Status: Enabled
+            Prefix: search-temp/
+            ExpirationInDays: 1
       NotificationConfiguration:
         TopicConfigurations:
           - Event: s3:ObjectCreated:*
@@ -206,6 +214,31 @@ Resources:
           Properties:
             Topic: !Ref UploadsTopic
 
+  # Called synchronously by the search API to tag a temporary query image
+  DetectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ecoguard-detect
+      CodeUri: tagger/
+      Handler: query_handler.handler
+      Timeout: 15
+      MemorySize: 256
+      Environment:
+        Variables:
+          BUCKET: !Ref BucketName
+          CONFIG_PARAM: !Ref ConfigParamName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${BucketName}/search-temp/*"
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ConfigParamName}"
+            # DetectLabels does not support resource-level permissions
+            - Effect: Allow
+              Action: rekognition:DetectLabels
+              Resource: "*"
 
 Outputs:
   ApiUrl:
@@ -214,3 +247,7 @@ Outputs:
     Value: !Ref MediaBucket
   TableName:
     Value: !Ref FilesTable
+  DetectFunctionArn:
+    Value: !GetAtt DetectFunction.Arn
+  FilesTableStreamArn:
+    Value: !GetAtt FilesTable.StreamArn
