@@ -153,6 +153,53 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/search/upload/init
             Method: post
+  
+  SearchUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Search completed media using an uploaded image
+      CodeUri: search_upload/
+      Handler: handler.handler
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+          TEMP_TABLE: !Ref SearchTempTable
+          DETECT_FUNCTION: arn:aws:lambda:ap-southeast-2:853611856490:function:ecoguard-detect
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt SearchTempTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/search-temp/*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/uploads/*"
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/thumbnails/*"
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: arn:aws:lambda:ap-southeast-2:853611856490:function:ecoguard-detect
+      Events:
+        SearchUpload:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/search/upload
+            Method: post
 
 Outputs:
   # Existing output
