@@ -76,15 +76,18 @@ def handler(event, context):
             f"search-temp/{uuid.uuid4().hex}{extension}"
         )
 
+        
         upload_url = s3.generate_presigned_url(
             "put_object",
             Params={
                 "Bucket": BUCKET,
                 "Key": image_key,
-                "ContentType": content_type
+                "ContentType": content_type,
+                "IfNoneMatch": "*"
             },
             ExpiresIn=300
         )
+
         
         
         temp_table.put_item(
