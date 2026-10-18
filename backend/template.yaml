@@ -109,6 +109,20 @@ Resources:
             Path: /media/search/thumbnail
             Method: post
   
+  SearchTempTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: image_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: image_key
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+  
   SearchUploadInitFunction:
     Type: AWS::Serverless::Function
     Properties:
