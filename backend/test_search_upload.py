@@ -180,3 +180,49 @@ def test_search_upload_rejects_expired_image():
             module.s3.head_object.assert_not_called()
             mock_temp_table.update_item.assert_not_called()
 
+
+def test_detect_tags_returns_species_counts():
+    handler_path = (
+        Path(__file__).resolve().parent
+        / "search_upload"
+        / "handler.py"
+    )
+
+    with patch.dict(os.environ, {
+        "TABLE": "test-files",
+        "TEMP_TABLE": "test-search-temp",
+        "BUCKET": "test-bucket",
+    }):
+        with patch("boto3.resource"), patch("boto3.client"):
+            spec = importlib.util.spec_from_file_location(
+                "search_upload_detect_test",
+                handler_path
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            from io import BytesIO
+
+            module.lambda_client.invoke.return_value = {
+                "StatusCode": 200,
+                "Payload": BytesIO(
+                    json.dumps({
+                        "tags": {"fox": 2}
+                    }).encode("utf-8")
+                )
+            }
+
+            image_key = "search-temp/" + "c" * 32 + ".jpg"
+
+            tags = module.detect_tags(image_key)
+
+            assert tags == {"fox": 2}
+
+            module.lambda_client.invoke.assert_called_once()
+
+            invoke_args = module.lambda_client.invoke.call_args.kwargs
+
+            assert invoke_args["InvocationType"] == "RequestResponse"
+            assert json.loads(invoke_args["Payload"]) == {
+                "key": image_key
+            }
