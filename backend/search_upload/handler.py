@@ -5,6 +5,7 @@ import logging
 import time
 import boto3
 from decimal import Decimal
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -118,3 +119,54 @@ def verify_upload(image_key, user_sub):
         return False
 
     return True
+
+
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",)
+}
+
+
+def validate_uploaded_image(image_key):
+    """Check that the temporary image exists and is valid."""
+
+    try:
+        metadata = s3.head_object(
+            Bucket=BUCKET,
+            Key=image_key
+        )
+    except ClientError as exc:
+        error_code = exc.response["Error"]["Code"]
+
+        if error_code in ("404", "NoSuchKey"):
+            return False, "Image has not been uploaded yet."
+
+        raise
+
+    content_type = metadata.get("ContentType", "")
+    size = metadata.get("ContentLength", 0)
+
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        return False, "Only JPEG and PNG images are supported."
+
+    if size <= 0 or size > MAX_IMAGE_SIZE:
+        return False, "Image must be between 1 byte and 10 MB."
+
+    # Verify the actual file signature, not just the Content-Type.
+    first_bytes = s3.get_object(
+        Bucket=BUCKET,
+        Key=image_key,
+        Range="bytes=0-7"
+    )["Body"].read()
+
+    valid_signatures = ALLOWED_IMAGE_TYPES[content_type]
+
+    if not any(
+        first_bytes.startswith(signature)
+        for signature in valid_signatures
+    ):
+        return False, "Image content does not match its declared type."
+
+    return True, None
