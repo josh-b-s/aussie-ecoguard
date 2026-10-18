@@ -32,8 +32,11 @@ def http(request):
         sys.exit(f"HTTP {e.code} from {request.full_url[:60]}: {e.read().decode()}")
 
 
-def init_upload(api, token, sha256, content_type):
-    body = json.dumps({"contentType": content_type, "sha256": sha256}).encode()
+def init_upload(api, token, sha256, content_type, visibility):
+    fields = {"contentType": content_type, "sha256": sha256}
+    if visibility:
+        fields["visibility"] = visibility
+    body = json.dumps(fields).encode()
     request = urllib.request.Request(
         f"{api}/upload/init",
         data=body,
@@ -70,6 +73,7 @@ def main():
     parser.add_argument("--api", required=True)
     parser.add_argument("--table", required=True)
     parser.add_argument("--token", required=True)
+    parser.add_argument("--visibility", choices=["public", "private"])
     parser.add_argument("file")
     args = parser.parse_args()
 
@@ -78,7 +82,7 @@ def main():
     data = path.read_bytes()
     sha256 = hashlib.sha256(data).hexdigest()
 
-    result = init_upload(args.api.rstrip("/"), args.token, sha256, content_type)
+    result = init_upload(args.api.rstrip("/"), args.token, sha256, content_type, args.visibility)
     print("init:", {k: v for k, v in result.items() if k != "uploadUrl"})
 
     if not result["duplicate"]:

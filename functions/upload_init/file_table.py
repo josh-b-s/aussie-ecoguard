@@ -10,7 +10,7 @@ table = boto3.resource("dynamodb").Table(os.environ["TABLE"])
 STALE_PENDING = timedelta(minutes=10)
 
 
-def create_pending(file_id, file_type, original_key, user_id):
+def create_pending(file_id, file_type, original_key, user_id, visibility):
     """Insert the file record. Returns False if a live record already exists.
 
     A failed record, or one pending past STALE_PENDING, is replaced so the upload can be retried.
@@ -23,6 +23,7 @@ def create_pending(file_id, file_type, original_key, user_id):
         "uploaded_by": user_id,
         "uploaded_at": now.isoformat(),
         "status": "pending",
+        "visibility": visibility,
         "tags": {},
     }
     try:

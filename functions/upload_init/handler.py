@@ -17,6 +17,8 @@ ALLOWED_TYPES = {
     "video/quicktime": ("mov", "video"),
 }
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+VISIBILITIES = ("public", "private")
+DEFAULT_VISIBILITY = "public"
 
 s3 = boto3.client("s3")
 
@@ -36,15 +38,20 @@ def handler(event, context):
     body = json.loads(event["body"] or "{}")
     content_type = body.get("contentType")
     sha256 = body.get("sha256", "")
+    visibility = body.get("visibility", DEFAULT_VISIBILITY)
 
-    if content_type not in ALLOWED_TYPES or not SHA256_HEX.match(sha256):
-        return respond(400, {"error": "unsupported contentType or invalid sha256"})
+    if (
+        content_type not in ALLOWED_TYPES
+        or not SHA256_HEX.match(sha256)
+        or visibility not in VISIBILITIES
+    ):
+        return respond(400, {"error": "unsupported contentType, invalid sha256 or visibility"})
 
     ext, file_type = ALLOWED_TYPES[content_type]
     key = f"uploads/{sha256}.{ext}"
     user_id = event["requestContext"]["authorizer"]["claims"]["sub"]
 
-    if not file_table.create_pending(sha256, file_type, key, user_id):
+    if not file_table.create_pending(sha256, file_type, key, user_id, visibility):
         return respond(200, {"duplicate": True, "fileId": sha256})
 
     upload_url = s3.generate_presigned_url(

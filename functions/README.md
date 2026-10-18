@@ -30,8 +30,10 @@ Accepted types: `image/jpeg`, `image/png`, `video/mp4`, `video/quicktime`. Rekog
 Request (header `Authorization: <Cognito ID token>`):
 
 ```json
-{"contentType": "image/jpeg", "sha256": "<64 lowercase hex characters>"}
+{"contentType": "image/jpeg", "sha256": "<64 lowercase hex characters>", "visibility": "public"}
 ```
+
+`visibility` is optional (`public` or `private`, default `public`).
 
 Response:
 
@@ -55,6 +57,7 @@ DynamoDB, partition key `file_id` (the SHA-256). Other members' APIs read and wr
 | `uploaded_by` | Cognito `sub` of the uploader |
 | `uploaded_at` | UTC ISO timestamp |
 | `status` | `pending`, `done` or `failed` |
+| `visibility` | `public` or `private`, set at init. Records created before this field existed were backfilled with `scripts/backfill_visibility.py` |
 
 Only S3 keys are stored. Build URLs when responding (presigned GET). The bucket is private. To delete a file, remove `original_key`, `thumbnail_key` (if present) and the record.
 
@@ -148,6 +151,7 @@ Each function has its own role:
 
 ## Known limits
 
+- A duplicate upload keeps the first uploader's owner and visibility; the second user's choice is ignored.
 - Dedup uses the hash the client sends. The server does not recompute it, so a client can claim a hash that does not match the bytes.
 - Init replaces a record that is `failed`, or `pending` for more than 10 minutes, so an abandoned or failed upload can be retried. The retrying user becomes the owner of the new record.
 - Rekognition cannot tell a cane toad from other toads, or a feral cat from a pet cat.
