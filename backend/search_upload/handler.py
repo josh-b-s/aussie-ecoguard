@@ -150,6 +150,20 @@ def claim_upload(image_key, user_sub):
             return False
         raise
 
+    
+def cleanup_upload(image_key):
+    """Delete the temporary image after a search attempt."""
+    try:
+        s3.delete_object(
+            Bucket=BUCKET,
+            Key=image_key
+        )
+    except ClientError:
+        logger.exception(
+            "Failed to delete temporary image: %s",
+            image_key
+        )
+
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 
@@ -253,6 +267,7 @@ def handler(event, context):
                 "error": "Upload has already been used or has expired."
             })
 
+       
         try:
             detected_tags = detect_tags(image_key)
         except Exception:
@@ -260,6 +275,8 @@ def handler(event, context):
             return response(502, {
                 "error": "Image detection service failed."
             })
+        finally:
+            cleanup_upload(image_key)
 
         if not detected_tags:
             return response(200, {
