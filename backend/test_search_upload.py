@@ -226,3 +226,98 @@ def test_detect_tags_returns_species_counts():
             assert json.loads(invoke_args["Payload"]) == {
                 "key": image_key
             }
+
+def test_search_upload_successful_matching():
+    from decimal import Decimal
+
+    handler_path = (
+        Path(__file__).resolve().parent
+        / "search_upload"
+        / "handler.py"
+    )
+
+    with patch.dict(os.environ, {
+        "TABLE": "test-files",
+        "TEMP_TABLE": "test-search-temp",
+        "BUCKET": "test-bucket",
+    }):
+        with patch("boto3.resource"), patch("boto3.client"):
+            spec = importlib.util.spec_from_file_location(
+                "search_upload_success_test",
+                handler_path
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            image_key = "search-temp/" + "d" * 32 + ".jpg"
+
+            # Simulate a valid upload and successful detection.
+            module.verify_upload = MagicMock(return_value=True)
+            module.validate_uploaded_image = MagicMock(
+                return_value=(True, None)
+            )
+            module.claim_upload = MagicMock(return_value=True)
+            module.detect_tags = MagicMock(
+                return_value={"fox": 2}
+            )
+            module.cleanup_upload = MagicMock()
+
+            # Simulate DynamoDB records.
+            module.table.scan.return_value = {
+                "Items": [
+                    {
+                        "file_id": "file-001",
+                        "status": "done",
+                        "visibility": "public",
+                        "uploaded_by": "another-user",
+                        "file_type": "image/jpeg",
+                        "tags": {"fox": Decimal("3")},
+                        "original_key": "uploads/fox.jpg"
+                    },
+                    {
+                        "file_id": "file-002",
+                        "status": "done",
+                        "visibility": "private",
+                        "uploaded_by": "another-user",
+                        "tags": {"fox": Decimal("5")}
+                    },
+                    {
+                        "file_id": "file-003",
+                        "status": "pending",
+                        "visibility": "public",
+                        "uploaded_by": "another-user",
+                        "tags": {"fox": Decimal("4")}
+                    },
+                    {
+                        "file_id": "file-004",
+                        "status": "done",
+                        "visibility": "public",
+                        "uploaded_by": "another-user",
+                        "tags": {"fox": Decimal("1")}
+                    }
+                ]
+            }
+
+            module.s3.generate_presigned_url.return_value = (
+                "https://example.com/fox.jpg"
+            )
+
+            event = {
+                "requestContext": {
+                    "authorizer": {
+                        "claims": {"sub": "current-user"}
+                    }
+                },
+                "body": json.dumps({"imageKey": image_key})
+            }
+
+            result = module.handler(event, None)
+            body = json.loads(result["body"])
+
+            assert result["statusCode"] == 200
+            assert body["detected_tags"] == {"fox": 2}
+            assert body["total"] == 1
+            assert body["results"][0]["file_id"] == "file-001"
+
+            module.detect_tags.assert_called_once_with(image_key)
+            module.cleanup_upload.assert_called_once_with(image_key)
