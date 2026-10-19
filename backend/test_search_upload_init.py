@@ -125,3 +125,54 @@ def test_upload_init_generates_presigned_url():
             assert item["image_key"] == image_key
             assert item["uploaded_by"] == "current-user"
             assert item["expires_at"] > 0
+
+def test_upload_init_rejects_unsupported_file_type():
+    handler_path = (
+        Path(__file__).resolve().parent
+        / "search_upload_init"
+        / "handler.py"
+    )
+
+    with patch.dict(os.environ, {
+        "TABLE": "test-files",
+        "TEMP_TABLE": "test-search-temp",
+        "BUCKET": "test-bucket",
+        "FRONTEND_ORIGIN": "http://localhost:5173",
+    }):
+        with patch("boto3.resource") as mock_resource, \
+             patch("boto3.client") as mock_client:
+
+            mock_resource.return_value.Table.return_value = MagicMock()
+            mock_client.return_value = MagicMock()
+
+            spec = importlib.util.spec_from_file_location(
+                "search_upload_init_filetype_test",
+                handler_path
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            for content_type in [
+                "application/pdf",
+                "image/gif",
+                "image/svg+xml",
+            ]:
+                event = {
+                    "requestContext": {
+                        "authorizer": {
+                            "claims": {"sub": "current-user"}
+                        }
+                    },
+                    "body": json.dumps({
+                        "contentType": content_type
+                    })
+                }
+
+                result = module.handler(event, None)
+
+                assert result["statusCode"] == 400, (
+                    f"Expected 400 for {content_type}"
+                )
+
+            module.s3.generate_presigned_url.assert_not_called()
+            module.temp_table.put_item.assert_not_called()
