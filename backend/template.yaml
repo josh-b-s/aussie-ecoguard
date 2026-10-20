@@ -224,6 +224,10 @@ Resources:
             Enabled: true
             MaximumRetryAttempts: 3
             MaximumRecordAgeInSeconds: 3600
+            DestinationConfig:
+              OnFailure:
+                Type: SQS
+                Destination: !GetAtt NotificationsDeadLetterQueue.Arn
       CodeUri: notifications_stream/
       Handler: handler.lambda_handler
       Runtime: python3.12
@@ -235,6 +239,11 @@ Resources:
       Policies:
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt AnimalNotificationsTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt NotificationsDeadLetterQueue.Arn
 
         - Statement:
             - Effect: Allow
