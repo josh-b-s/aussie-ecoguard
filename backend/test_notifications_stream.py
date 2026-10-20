@@ -1,10 +1,42 @@
 import json
 
 from notifications_stream.handler import lambda_handler
-
-
 from unittest.mock import patch
+import pytest
 
+
+@patch("notifications_stream.handler.sns")
+def test_sns_failure_is_propagated(mock_sns):
+    mock_sns.publish.side_effect = RuntimeError(
+        "SNS temporarily unavailable"
+    )
+
+    event = {
+        "Records": [
+            {
+                "eventName": "MODIFY",
+                "dynamodb": {
+                    "OldImage": {
+                        "status": {"S": "processing"}
+                    },
+                    "NewImage": {
+                        "status": {"S": "done"},
+                        "tags": {
+                            "M": {
+                                "fox": {"N": "1"}
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="SNS temporarily unavailable"
+    ):
+        lambda_handler(event, None)
 
 @patch("notifications_stream.handler.sns")
 def test_processing_to_done(mock_sns):
