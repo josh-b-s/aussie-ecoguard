@@ -1,10 +1,13 @@
 import json
+import os
+import boto3
 
 from boto3.dynamodb.types import TypeDeserializer
 
 
 deserializer = TypeDeserializer()
-
+sns = boto3.client("sns")
+SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
 
 def decode_image(image):
     """Convert a DynamoDB Stream image into a Python dictionary."""
