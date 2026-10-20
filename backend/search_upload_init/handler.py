@@ -5,11 +5,15 @@ import os
 import uuid
 import time
 import boto3
+from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-s3 = boto3.client("s3")
+s3 = boto3.client(
+    "s3",
+    config=Config(signature_version="s3v4")
+)
 dynamodb = boto3.resource("dynamodb")
 temp_table = dynamodb.Table(os.environ["TEMP_TABLE"])
 
