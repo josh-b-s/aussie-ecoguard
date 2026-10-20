@@ -75,7 +75,8 @@ def test_already_done_does_not_notify(mock_sns):
     assert result["statusCode"] == 200
     mock_sns.publish.assert_not_called()
 
-def test_still_processing_does_not_notify(capsys):
+@patch("notifications_stream.handler.sns")
+def test_still_processing_does_not_notify(mock_sns):
     event = {
         "Records": [
             {
@@ -99,7 +100,5 @@ def test_still_processing_does_not_notify(capsys):
 
     result = lambda_handler(event, None)
 
-    captured = capsys.readouterr().out
-
     assert result["statusCode"] == 200
-    assert captured == ""
+    mock_sns.publish.assert_not_called()
