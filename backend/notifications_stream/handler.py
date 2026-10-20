@@ -40,9 +40,24 @@ def lambda_handler(event, context):
 
         tags = new_image.get("tags", {})
 
-        print(json.dumps({
+        if not tags:
+            continue
+
+        message = {
             "event": "image_processing_completed",
             "tags": list(tags.keys())
-        }))
+        }
+
+        sns.publish(
+            TopicArn=SNS_TOPIC_ARN,
+            Message=json.dumps(message),
+            Subject="EcoGuard Animal Notification",
+            MessageAttributes={
+                "animal_tags": {
+                    "DataType": "String.Array",
+                    "StringValue": json.dumps(list(tags.keys()))
+                }
+            }
+        )
 
     return {"statusCode": 200}
