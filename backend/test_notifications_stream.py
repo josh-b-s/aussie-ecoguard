@@ -3,7 +3,11 @@ import json
 from notifications_stream.handler import lambda_handler
 
 
-def test_processing_to_done(capsys):
+from unittest.mock import patch
+
+
+@patch("notifications_stream.handler.sns")
+def test_processing_to_done(mock_sns):
     event = {
         "Records": [
             {
@@ -27,12 +31,21 @@ def test_processing_to_done(capsys):
 
     result = lambda_handler(event, None)
 
-    captured = capsys.readouterr().out
-    notification = json.loads(captured.strip())
-
     assert result["statusCode"] == 200
-    assert notification["event"] == "image_processing_completed"
-    assert notification["tags"] == ["fox"]
+    mock_sns.publish.assert_called_once()
+
+    publish_args = mock_sns.publish.call_args.kwargs
+
+    message = json.loads(publish_args["Message"])
+
+    assert message["event"] == "image_processing_completed"
+    assert message["tags"] == ["fox"]
+
+    attributes = publish_args["MessageAttributes"]
+    assert attributes["animal_tags"]["DataType"] == "String.Array"
+    assert json.loads(
+        attributes["animal_tags"]["StringValue"]
+    ) == ["fox"]
 
 def test_already_done_does_not_notify(capsys):
     event = {
