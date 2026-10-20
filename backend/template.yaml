@@ -225,7 +225,7 @@ Resources:
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref AnimalNotificationsTopic
-        Policies:
+      Policies:
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt AnimalNotificationsTopic.TopicName
 
