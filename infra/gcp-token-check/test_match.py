@@ -218,3 +218,18 @@ def test_candidate_must_match_its_file_id():
         check_candidate(ID_A, url("search-temp", f"{ID_A}.jpg"))
     assert check_candidate(ID_A, url("thumbnails", f"{ID_A}.jpg")) == f"/thumbnails/{ID_A}.jpg"
     assert check_candidate(ID_C, url("uploads", f"{ID_C}.png")) == f"/uploads/{ID_C}.png"
+
+
+def test_long_presigned_url_with_session_token_is_accepted():
+    """Presigned URLs made with temporary credentials exceed 2,000 characters."""
+    token = "A" * 2500
+    long_query = url("search-temp", "q.jpg") + f"&X-Amz-Security-Token={token}"
+    long_cand = url("thumbnails", f"{ID_B}.jpg") + f"&X-Amz-Security-Token={token}"
+    IMAGES["/search-temp/q.jpg"] = BROWN
+    serve(ID_B, BROWN2)
+    r = client.post(
+        "/match",
+        json={"query_url": long_query, "candidates": [{"file_id": ID_B, "url": long_cand}]},
+    )
+    assert r.status_code == 200
+    assert [m["file_id"] for m in r.json()["matches"]] == [ID_B]

@@ -25,6 +25,8 @@ router = APIRouter()
 
 MAX_CANDIDATES = 20
 MAX_BYTES = 10 * 1024 * 1024
+# Presigned URLs from temporary AWS credentials carry a long session token.
+URL_MAX = 8192
 MAX_RESULTS = int(os.environ.get("MAX_RESULTS", "10"))
 MIN_SCORE = float(os.environ.get("MIN_SCORE", "0.25"))
 WORKERS = 6
@@ -36,11 +38,11 @@ class FetchError(RuntimeError):
 
 class Candidate(BaseModel):
     file_id: str = Field(max_length=64)
-    url: str = Field(max_length=2048)
+    url: str = Field(max_length=URL_MAX)
 
 
 class MatchRequest(BaseModel):
-    query_url: str = Field(max_length=2048)
+    query_url: str = Field(max_length=URL_MAX)
     candidates: list[Candidate] = Field(default_factory=list, max_length=MAX_CANDIDATES)
 
 
