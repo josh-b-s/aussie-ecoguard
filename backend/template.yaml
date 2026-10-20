@@ -205,10 +205,18 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/search/upload
             Method: post
-            
+
   NotificationsStreamFunction:
     Type: AWS::Serverless::Function
     Properties:
+      Events:
+        FilesTableStream:
+          Type: DynamoDB
+          Properties:
+            Stream: arn:aws:dynamodb:ap-southeast-2:853611856490:table/ecoguard-pipeline-FilesTable-7T9WJ72MHXFO/stream/2026-10-18T08:54:50.113
+            StartingPosition: LATEST
+            BatchSize: 1
+            Enabled: true
       CodeUri: notifications_stream/
       Handler: handler.lambda_handler
       Runtime: python3.12
