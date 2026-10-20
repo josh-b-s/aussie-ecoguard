@@ -217,6 +217,8 @@ Resources:
             StartingPosition: LATEST
             BatchSize: 1
             Enabled: true
+            MaximumRetryAttempts: 3
+            MaximumRecordAgeInSeconds: 3600
       CodeUri: notifications_stream/
       Handler: handler.lambda_handler
       Runtime: python3.12
