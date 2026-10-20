@@ -31,6 +31,10 @@ Globals:
         BUCKET: !Ref ExistingBucketName
 
 Resources:
+  AnimalNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ecoguard-animal-notifications
 # Existing API Gateway configuration
   BackendApi:
     Type: AWS::Serverless::Api
