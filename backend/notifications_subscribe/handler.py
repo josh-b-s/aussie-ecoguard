@@ -38,6 +38,18 @@ def lambda_handler(event, context):
     animal_tags = body.get("animal_tags")
     table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
 
+    existing = table.get_item(
+        Key={"user_id": claims["sub"]}
+    ).get("Item")
+
+    if existing and existing.get("status") == "pending":
+        return {
+            "statusCode": 409,
+            "body": json.dumps({
+                "error": "A subscription is already pending confirmation"
+            })
+        }
+
     table.put_item(
         Item={
             "user_id": claims["sub"],
