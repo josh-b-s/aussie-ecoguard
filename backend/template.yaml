@@ -132,6 +132,16 @@ Resources:
         AttributeName: expires_at
         Enabled: true
   
+  NotificationSubscriptionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
  
   SearchUploadInitFunction:
     Type: AWS::Serverless::Function
