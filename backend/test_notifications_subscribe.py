@@ -70,3 +70,31 @@ def test_unverified_email_is_rejected():
 
     body = json.loads(result["body"])
     assert body["error"] == "A verified email address is required"
+
+@patch("notifications_subscribe.handler.sns")
+def test_empty_animal_tags_are_rejected(mock_sns):
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": []
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 400
+
+    body = json.loads(result["body"])
+    assert body["error"] == (
+        "animal_tags must be a non-empty list of strings"
+    )
+
+    mock_sns.subscribe.assert_not_called()
