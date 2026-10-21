@@ -160,3 +160,32 @@ def test_completed_image_without_tags_does_not_notify(mock_sns):
 
     assert result["statusCode"] == 200
     mock_sns.publish.assert_not_called()
+
+@patch("notifications_stream.handler.sns")
+def test_private_upload_does_not_notify(mock_sns):
+    event = {
+        "Records": [
+            {
+                "eventName": "MODIFY",
+                "dynamodb": {
+                    "OldImage": {
+                        "status": {"S": "processing"}
+                    },
+                    "NewImage": {
+                        "status": {"S": "done"},
+                        "visibility": {"S": "private"},
+                        "tags": {
+                            "M": {
+                                "fox": {"N": "1"}
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 200
+    mock_sns.publish.assert_not_called()
