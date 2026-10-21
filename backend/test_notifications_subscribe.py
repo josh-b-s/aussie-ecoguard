@@ -1,12 +1,13 @@
 import json
 from unittest.mock import patch
 
-with patch("boto3.client"):
+with patch("boto3.client"), patch("boto3.resource"):
     from notifications_subscribe.handler import lambda_handler
 
 
+@patch("notifications_subscribe.handler.dynamodb")
 @patch("notifications_subscribe.handler.sns")
-def test_verified_email_is_accepted(mock_sns):
+def test_verified_email_is_accepted(mock_sns, mock_dynamodb):
     mock_sns.subscribe.return_value = {
         "SubscriptionArn": "pending confirmation"
     }
@@ -39,6 +40,16 @@ def test_verified_email_is_accepted(mock_sns):
     assert kwargs["ReturnSubscriptionArn"] is True
 
     assert "Attributes" not in kwargs
+    mock_dynamodb.Table.assert_called_once()
+
+    mock_dynamodb.Table.return_value.put_item.assert_called_once_with(
+        Item={
+            "user_id": "test-user-123",
+            "email": "test@example.com",
+            "animal_tags": ["fox", "koala"],
+            "status": "pending"
+        }
+    )
 
 def test_unverified_email_is_rejected():
     event = {
