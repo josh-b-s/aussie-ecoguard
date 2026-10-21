@@ -38,6 +38,10 @@ def lambda_handler(event, context):
         if old_image.get("status") == "done":
             continue
 
+        # Only notify subscribers about public uploads.
+        if new_image.get("visibility") != "public":
+            continue
+
         tags = new_image.get("tags", {})
 
         if not tags:
