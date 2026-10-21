@@ -56,7 +56,8 @@ def lambda_handler(event, context):
             "email": email,
             "animal_tags": animal_tags,
             "status": "pending"
-        }
+        },
+        ConditionExpression="attribute_not_exists(user_id)"
     )
 
     if (
