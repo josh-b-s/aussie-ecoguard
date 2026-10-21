@@ -221,6 +221,39 @@ Resources:
             Path: /media/search/upload
             Method: post
 
+  NotificationsSubscribeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Manage animal notification email subscriptions
+      CodeUri: notifications_subscribe/
+      Handler: handler.lambda_handler
+      Timeout: 15
+      MemorySize: 128
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref AnimalNotificationsTopic
+          SUBSCRIPTIONS_TABLE: !Ref NotificationSubscriptionsTable
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt NotificationSubscriptionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sns:Subscribe
+              Resource: !Ref AnimalNotificationsTopic
+      Events:
+        Subscribe:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /notifications/subscribe
+            Method: post
+
   NotificationsStreamFunction:
     Type: AWS::Serverless::Function
     Properties:
