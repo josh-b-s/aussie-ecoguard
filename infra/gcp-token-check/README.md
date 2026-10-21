@@ -5,7 +5,9 @@ involved: only the pool ID, region and app client ID (all public values).
 
 ## Files
 - `auth.py`: `get_current_user` dependency. Put `Depends(get_current_user)` on every protected route.
-- `main.py`: example service. `/health` is public, `/me` is protected.
+- `main.py`: example service. `/health` is public, `/me` and `/match` are protected.
+- `match.py`, `features.py`, `urlcheck.py`: lost-pet matching (`POST /match`, see below).
+- `test_match.py`: offline tests for `/match` (no network, no Cloud Vision).
 - `test_auth.py`: offline tests (valid ID/access token, expired, wrong issuer/client/signature, alg=none, garbage).
 
 ## Run tests locally
@@ -18,11 +20,14 @@ pytest -q
 ## Deploy (GCP project ecoguard-g11-14145)
 ```
 gcloud config set project ecoguard-g11-14145
+gcloud services enable vision.googleapis.com run.googleapis.com cloudbuild.googleapis.com
 gcloud run deploy ecoguard-api \
   --source . \
   --region australia-southeast1 \
+  --service-account ecoguard-api-sa@ecoguard-g11-14145.iam.gserviceaccount.com \
   --allow-unauthenticated \
   --min-instances 0 \
+  --memory 512Mi --timeout 60 \
   --set-env-vars COGNITO_REGION=ap-southeast-2,COGNITO_USER_POOL_ID=ap-southeast-2_WI1ngaH1k,COGNITO_APP_CLIENT_ID=5tv0jne3t88vcrc5408vrtnl6s,ALLOWED_ORIGINS=http://localhost:5173
 ```
 `--allow-unauthenticated` only means Cloud Run itself does not require a Google
@@ -46,3 +51,36 @@ Expected: 401 without a token or with an expired/tampered one.
 - Checks `iss`, `exp`, `token_use` and the app client ID (`aud` for ID tokens, `client_id` for access tokens).
 - Only RS256 is accepted, so `alg: none` and HS256 tokens are rejected.
 - No credentials in code or the frontend. Config comes from environment variables.
+
+## POST /match (lost-pet matching)
+The AWS search Lambda picks the candidate images, signs S3 GET URLs and calls this
+route with the user's own Cognito ID token (`Authorization: Bearer <ID token>`).
+
+Request:
+```json
+{"query_url": "https://<bucket host>/search-temp/<id>.jpg?...",
+ "candidates": [{"file_id": "<sha256>", "url": "https://<bucket host>/thumbnails/<sha256>.jpg?..."}]}
+```
+Response 200, best first, score 0 to 1 (candidates below `MIN_SCORE`, default 0.25, are left out; at most `MAX_RESULTS`, default 10):
+```json
+{"matches": [{"file_id": "<sha256>", "score": 0.82}], "skipped": 0}
+```
+`skipped` counts candidates that could not be downloaded or decoded.
+Errors: 400 bad request or rejected URL, 401 bad or missing token, 502 Vision failed.
+
+How it scores: 60% Cloud Vision label similarity (weighted Jaccard) + 40% colour
+histogram similarity computed locally with Pillow. This finds animals of the same kind
+and colouring; it cannot recognise an individual animal.
+
+Security: URLs must be https on our bucket host (`ALLOWED_S3_HOSTS`), under
+`/search-temp/` (query) or `/thumbnails/`, `/uploads/` (candidates, named after their
+`file_id`). Redirects are not followed, so the service cannot be used to reach other hosts.
+The service holds no S3 credentials. Max 20 candidates and 10 MB per image.
+
+Cost: Cloud Vision label detection is 1 unit per image analysed, first 1,000 units per month
+free, then about US$1.50 per 1,000. One request with 20 uncached candidates is 21 units.
+Candidate results are cached in memory per image, so repeat searches mostly cost 1 unit.
+Keep test loops small.
+
+Setup: enable the Vision API (see Deploy). If the first call returns 403, grant the service
+account `roles/serviceusage.serviceUsageConsumer`.
