@@ -36,6 +36,16 @@ def lambda_handler(event, context):
         }
 
     animal_tags = body.get("animal_tags")
+    table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
+
+    table.put_item(
+        Item={
+            "user_id": claims["sub"],
+            "email": email,
+            "animal_tags": animal_tags,
+            "status": "pending"
+        }
+    )
 
     if (
         not isinstance(animal_tags, list)
