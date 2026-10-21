@@ -48,7 +48,8 @@ def test_verified_email_is_accepted(mock_sns, mock_dynamodb):
             "email": "test@example.com",
             "animal_tags": ["fox", "koala"],
             "status": "pending"
-        }
+        },
+        ConditionExpression="attribute_not_exists(user_id)"
     )
 
 def test_unverified_email_is_rejected():
