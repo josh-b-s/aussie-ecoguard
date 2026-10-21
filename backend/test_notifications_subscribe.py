@@ -38,18 +38,7 @@ def test_verified_email_is_accepted(mock_sns):
     assert kwargs["Endpoint"] == "test@example.com"
     assert kwargs["ReturnSubscriptionArn"] is True
 
-    filter_policy = json.loads(
-        kwargs["Attributes"]["FilterPolicy"]
-    )
-
-    assert filter_policy == {
-        "animal_tags": ["fox", "koala"]
-    }
-
-    assert (
-        kwargs["Attributes"]["FilterPolicyScope"]
-        == "MessageAttributes"
-    )
+    assert "Attributes" not in kwargs
 
 def test_unverified_email_is_rejected():
     event = {
