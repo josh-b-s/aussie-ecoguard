@@ -55,17 +55,11 @@ def lambda_handler(event, context):
     })
 
     response = sns.subscribe(
-        TopicArn=SNS_TOPIC_ARN,
-        Protocol="email",
-        Endpoint=email,
-        ReturnSubscriptionArn=True,
-        Attributes={
-            "FilterPolicy": json.dumps({
-                "animal_tags": animal_tags
-            }),
-            "FilterPolicyScope": "MessageAttributes"
-        }
-    )
+    TopicArn=SNS_TOPIC_ARN,
+    Protocol="email",
+    Endpoint=email,
+    ReturnSubscriptionArn=True
+)
 
     return {
         "statusCode": 202,
