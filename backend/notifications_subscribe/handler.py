@@ -5,6 +5,8 @@ import boto3
 
 sns = boto3.client("sns")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
+dynamodb = boto3.resource("dynamodb")
+SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE")
 
 
 def lambda_handler(event, context):
