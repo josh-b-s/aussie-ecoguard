@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch
 from botocore.exceptions import ClientError
-
+import pytest
 with patch("boto3.client"), patch("boto3.resource"):
     from notifications_subscribe.handler import lambda_handler
 
