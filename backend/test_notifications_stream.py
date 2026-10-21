@@ -50,11 +50,12 @@ def test_processing_to_done(mock_sns):
                     },
                     "NewImage": {
                         "status": {"S": "done"},
+                        "visibility": {"S": "public"},
                         "tags": {
                             "M": {
                                 "fox": {"N": "1"}
                             }
-                        }
+                        }, 
                     }
                 }
             }
