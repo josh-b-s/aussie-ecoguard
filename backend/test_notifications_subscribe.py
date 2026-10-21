@@ -175,3 +175,47 @@ def test_concurrent_subscription_returns_409(mock_sns, mock_dynamodb):
     assert result["statusCode"] == 409
     mock_table.put_item.assert_called_once()
     mock_sns.subscribe.assert_not_called()
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_sns_failure_cleans_up_pending_record(
+    mock_sns, mock_dynamodb
+):
+    mock_table = mock_dynamodb.Table.return_value
+    mock_table.get_item.return_value = {}
+
+    mock_sns.subscribe.side_effect = RuntimeError(
+        "SNS temporarily unavailable"
+    )
+
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["fox"]
+        })
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="SNS temporarily unavailable"
+    ):
+        lambda_handler(event, None)
+
+    mock_table.delete_item.assert_called_once_with(
+        Key={"user_id": "test-user-123"},
+        ConditionExpression="#status = :pending",
+        ExpressionAttributeNames={
+            "#status": "status"
+        },
+        ExpressionAttributeValues={
+            ":pending": "pending"
+        }
+    )
