@@ -98,3 +98,40 @@ def test_empty_animal_tags_are_rejected(mock_sns):
     )
 
     mock_sns.subscribe.assert_not_called()
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_existing_pending_subscription_is_rejected(
+    mock_sns, mock_dynamodb
+):
+    mock_table = mock_dynamodb.Table.return_value
+
+    mock_table.get_item.return_value = {
+        "Item": {
+            "user_id": "test-user-123",
+            "email": "test@example.com",
+            "animal_tags": ["fox"],
+            "status": "pending"
+        }
+    }
+
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["fox", "koala"]
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 409
+    mock_sns.subscribe.assert_not_called()
+    mock_table.put_item.assert_not_called()
