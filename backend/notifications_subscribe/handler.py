@@ -107,12 +107,25 @@ def lambda_handler(event, context):
             }
         raise
 
-    response = sns.subscribe(
-        TopicArn=SNS_TOPIC_ARN,
-        Protocol="email",
-        Endpoint=email,
-        ReturnSubscriptionArn=True
-    )
+    try:
+        response = sns.subscribe(
+            TopicArn=SNS_TOPIC_ARN,
+            Protocol="email",
+            Endpoint=email,
+            ReturnSubscriptionArn=True
+        )
+    except Exception:
+        table.delete_item(
+            Key={"user_id": user_id},
+            ConditionExpression="#status = :pending",
+            ExpressionAttributeNames={
+                "#status": "status"
+            },
+            ExpressionAttributeValues={
+                ":pending": "pending"
+            }
+        )
+        raise
 
     return {
         "statusCode": 202,
