@@ -1,6 +1,6 @@
 import json
 from unittest.mock import patch
-
+from botocore.exceptions import ClientError
 
 with patch("boto3.client"), patch("boto3.resource"):
     from notifications_subscribe.handler import lambda_handler
@@ -137,3 +137,41 @@ def test_existing_pending_subscription_is_rejected(
     assert result["statusCode"] == 409
     mock_sns.subscribe.assert_not_called()
     mock_table.put_item.assert_not_called()
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_concurrent_subscription_returns_409(mock_sns, mock_dynamodb):
+    mock_table = mock_dynamodb.Table.return_value
+
+    mock_table.get_item.return_value = {}
+
+    mock_table.put_item.side_effect = ClientError(
+        {
+            "Error": {
+                "Code": "ConditionalCheckFailedException",
+                "Message": "Conditional request failed"
+            }
+        },
+        "PutItem"
+    )
+
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["fox", "koala"]
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 409
+    mock_table.put_item.assert_called_once()
+    mock_sns.subscribe.assert_not_called()
