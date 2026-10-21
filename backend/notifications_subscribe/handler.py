@@ -1,10 +1,13 @@
+
 import json
 import os
 
 import boto3
+from botocore.exceptions import ClientError
 
 sns = boto3.client("sns")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
+
 dynamodb = boto3.resource("dynamodb")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE")
 
@@ -18,8 +21,13 @@ def lambda_handler(event, context):
 
     email = claims.get("email")
     email_verified = claims.get("email_verified")
+    user_id = claims.get("sub")
 
-    if not email or str(email_verified).lower() != "true":
+    if (
+        not user_id
+        or not email
+        or str(email_verified).lower() != "true"
+    ):
         return {
             "statusCode": 403,
             "body": json.dumps({
@@ -35,30 +43,13 @@ def lambda_handler(event, context):
             "body": json.dumps({"error": "Invalid JSON body"})
         }
 
-    animal_tags = body.get("animal_tags")
-    table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
-
-    existing = table.get_item(
-        Key={"user_id": claims["sub"]}
-    ).get("Item")
-
-    if existing and existing.get("status") == "pending":
+    if not isinstance(body, dict):
         return {
-            "statusCode": 409,
-            "body": json.dumps({
-                "error": "A subscription is already pending confirmation"
-            })
+            "statusCode": 400,
+            "body": json.dumps({"error": "Invalid request body"})
         }
 
-    table.put_item(
-        Item={
-            "user_id": claims["sub"],
-            "email": email,
-            "animal_tags": animal_tags,
-            "status": "pending"
-        },
-        ConditionExpression="attribute_not_exists(user_id)"
-    )
+    animal_tags = body.get("animal_tags")
 
     if (
         not isinstance(animal_tags, list)
@@ -79,12 +70,49 @@ def lambda_handler(event, context):
         tag.strip().lower() for tag in animal_tags
     })
 
+    table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
+
+    existing = table.get_item(
+        Key={"user_id": user_id}
+    ).get("Item")
+
+    if existing and existing.get("status") == "pending":
+        return {
+            "statusCode": 409,
+            "body": json.dumps({
+                "error": "A subscription is already pending confirmation"
+            })
+        }
+
+    try:
+        table.put_item(
+            Item={
+                "user_id": user_id,
+                "email": email,
+                "animal_tags": animal_tags,
+                "status": "pending"
+            },
+            ConditionExpression="attribute_not_exists(user_id)"
+        )
+    except ClientError as error:
+        if (
+            error.response["Error"]["Code"]
+            == "ConditionalCheckFailedException"
+        ):
+            return {
+                "statusCode": 409,
+                "body": json.dumps({
+                    "error": "A subscription already exists"
+                })
+            }
+        raise
+
     response = sns.subscribe(
-    TopicArn=SNS_TOPIC_ARN,
-    Protocol="email",
-    Endpoint=email,
-    ReturnSubscriptionArn=True
-)
+        TopicArn=SNS_TOPIC_ARN,
+        Protocol="email",
+        Endpoint=email,
+        ReturnSubscriptionArn=True
+    )
 
     return {
         "statusCode": 202,

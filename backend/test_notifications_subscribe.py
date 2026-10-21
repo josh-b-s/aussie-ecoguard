@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+
 with patch("boto3.client"), patch("boto3.resource"):
     from notifications_subscribe.handler import lambda_handler
 
