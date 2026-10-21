@@ -21,6 +21,7 @@ def test_sns_failure_is_propagated(mock_sns):
                     },
                     "NewImage": {
                         "status": {"S": "done"},
+                        "visibility": {"S": "public"},
                         "tags": {
                             "M": {
                                 "fox": {"N": "1"}
