@@ -27,6 +27,25 @@ def api_response(status_code, body):
         "body": json.dumps(body)
     }
 
+def find_email_subscriptions(email):
+    subscriptions = []
+    paginator = sns.get_paginator(
+        "list_subscriptions_by_topic"
+    )
+
+    for page in paginator.paginate(
+        TopicArn=SNS_TOPIC_ARN
+    ):
+        for subscription in page.get("Subscriptions", []):
+            if (
+                subscription.get("Protocol") == "email"
+                and subscription.get("Endpoint", "").lower()
+                == email.lower()
+            ):
+                subscriptions.append(subscription)
+
+    return subscriptions
+
 def lambda_handler(event, context):
     claims = (
         event.get("requestContext", {})
