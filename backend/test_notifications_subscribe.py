@@ -6,9 +6,10 @@ with patch("boto3.client"), patch("boto3.resource"):
     from notifications_subscribe.handler import lambda_handler
 
 
+@patch("notifications_subscribe.handler.time.time", return_value=1000000)
 @patch("notifications_subscribe.handler.dynamodb")
 @patch("notifications_subscribe.handler.sns")
-def test_verified_email_is_accepted(mock_sns, mock_dynamodb):
+def test_verified_email_is_accepted(mock_sns, mock_dynamodb, mock_time):
     mock_sns.subscribe.return_value = {
         "SubscriptionArn": "pending confirmation"
     }
@@ -57,7 +58,8 @@ def test_verified_email_is_accepted(mock_sns, mock_dynamodb):
             "user_id": "test-user-123",
             "email": "test@example.com",
             "animal_tags": ["fox", "koala"],
-            "status": "pending"
+            "status": "pending", 
+            "expires_at": 1086400
         },
         ConditionExpression="attribute_not_exists(user_id)"
     )
