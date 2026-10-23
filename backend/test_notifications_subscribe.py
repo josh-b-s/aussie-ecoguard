@@ -49,7 +49,7 @@ def test_verified_email_is_accepted(mock_sns, mock_dynamodb):
     assert filter_policy == {
         "animal_tags": ["fox", "koala"]
     }
-    
+
     mock_dynamodb.Table.assert_called_once()
 
     mock_dynamodb.Table.return_value.put_item.assert_called_once_with(
@@ -228,3 +228,22 @@ def test_sns_failure_cleans_up_pending_record(
             ":pending": "pending"
         }
     )
+
+def test_cors_headers_are_returned():
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {}
+            }
+        }
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 403
+
+    assert result["headers"]["Access-Control-Allow-Origin"] == (
+        "http://localhost:5173"
+    )
+
+    assert result["headers"]["Content-Type"] == "application/json"
