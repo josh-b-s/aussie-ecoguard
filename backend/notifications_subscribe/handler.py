@@ -43,12 +43,9 @@ def lambda_handler(event, context):
         or not email
         or str(email_verified).lower() != "true"
     ):
-        return {
-            "statusCode": 403,
-            "body": json.dumps({
-                "error": "A verified email address is required"
-            })
-        }
+        return api_response(403, {
+            "error": "A verified email address is required"
+        })
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -148,10 +145,7 @@ def lambda_handler(event, context):
         )
         raise
 
-    return {
-        "statusCode": 202,
-        "body": json.dumps({
-            "message": "Check your email to confirm the subscription",
-            "subscription_arn": response.get("SubscriptionArn")
-        })
-    }
+    return api_response(202, {
+        "message": "Check your email to confirm the subscription",
+        "subscription_arn": response.get("SubscriptionArn")
+    })
