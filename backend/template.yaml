@@ -249,6 +249,8 @@ Resources:
             - Effect: Allow
               Action:
                 - sns:Subscribe
+                - sns:ListSubscriptionsByTopic
+                - sns:GetSubscriptionAttributes
               Resource: !Ref AnimalNotificationsTopic
       Events:
         Subscribe:
