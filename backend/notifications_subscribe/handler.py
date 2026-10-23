@@ -82,6 +82,11 @@ def lambda_handler(event, context):
         tag.strip().lower() for tag in animal_tags
     })
 
+    if len(animal_tags) > 20:
+        return api_response(400, {
+            "error": "A maximum of 20 animal tags is allowed"
+        })
+
     table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
 
     existing = table.get_item(
