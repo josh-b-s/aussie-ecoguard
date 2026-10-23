@@ -320,3 +320,48 @@ def test_expired_pending_subscription(
     result = lambda_handler(event, None)
 
     assert result["statusCode"] != 409
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_subscription_arn_is_saved(mock_sns, mock_dynamodb):
+    mock_table = mock_dynamodb.Table.return_value
+    mock_table.get_item.return_value = {}
+
+    mock_sns.subscribe.return_value = {
+        "SubscriptionArn": (
+            "arn:aws:sns:ap-southeast-2:123456789012:"
+            "ecoguard-animal-notifications:abc123"
+        )
+    }
+
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["fox"]
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 202
+
+    mock_table.update_item.assert_called_once_with(
+        Key={"user_id": "test-user-123"},
+        UpdateExpression="SET subscription_arn = :arn",
+        ConditionExpression="#status = :pending",
+        ExpressionAttributeNames={
+            "#status": "status"
+        },
+        ExpressionAttributeValues={
+            ":arn": mock_sns.subscribe.return_value["SubscriptionArn"],
+            ":pending": "pending"
+        }
+    )
