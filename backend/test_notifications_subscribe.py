@@ -3,7 +3,10 @@ from unittest.mock import patch
 from botocore.exceptions import ClientError
 import pytest
 with patch("boto3.client"), patch("boto3.resource"):
-    from notifications_subscribe.handler import lambda_handler
+    from notifications_subscribe.handler import (
+    lambda_handler,
+    find_email_subscriptions
+)
 
 
 @patch("notifications_subscribe.handler.time.time", return_value=1000000)
@@ -364,4 +367,34 @@ def test_subscription_arn_is_saved(mock_sns, mock_dynamodb):
             ":arn": mock_sns.subscribe.return_value["SubscriptionArn"],
             ":pending": "pending"
         }
+    )
+
+@patch("notifications_subscribe.handler.sns")
+def test_find_email_subscriptions(mock_sns):
+    mock_paginator = mock_sns.get_paginator.return_value
+
+    mock_paginator.paginate.return_value = [
+        {
+            "Subscriptions": [
+                {
+                    "Protocol": "email",
+                    "Endpoint": "test@example.com",
+                    "SubscriptionArn": "arn:subscription-123"
+                },
+                {
+                    "Protocol": "email",
+                    "Endpoint": "other@example.com",
+                    "SubscriptionArn": "arn:subscription-456"
+                }
+            ]
+        }
+    ]
+
+    result = find_email_subscriptions("test@example.com")
+
+    assert len(result) == 1
+    assert result[0]["SubscriptionArn"] == "arn:subscription-123"
+
+    mock_sns.get_paginator.assert_called_once_with(
+        "list_subscriptions_by_topic"
     )
