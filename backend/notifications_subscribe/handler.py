@@ -94,6 +94,14 @@ def lambda_handler(event, context):
     ).get("Item")
 
     if existing and existing.get("status") == "pending":
+        expires_at = existing.get("expires_at", 0)
+
+        if expires_at <= int(time.time()):
+            return api_response(409, {
+                "error": "Subscription expired; reconciliation required"
+            })
+
+    if existing and existing.get("status") == "pending":
         return {
             "statusCode": 409,
             "body": json.dumps({
