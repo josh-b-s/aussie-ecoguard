@@ -142,6 +142,9 @@ Resources:
       KeySchema:
         - AttributeName: user_id
           KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
  
   SearchUploadInitFunction:
     Type: AWS::Serverless::Function
