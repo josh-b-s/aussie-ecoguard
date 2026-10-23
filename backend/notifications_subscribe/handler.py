@@ -173,12 +173,9 @@ def lambda_handler(event, context):
             })
 
     if existing and existing.get("status") == "pending":
-        return {
-            "statusCode": 409,
-            "body": json.dumps({
-                "error": "A subscription is already pending confirmation"
-            })
-        }
+        return api_response(409, {
+            "error": "A subscription is already pending confirmation"
+        })
 
     try:
         table.put_item(
