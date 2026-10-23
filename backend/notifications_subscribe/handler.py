@@ -46,6 +46,32 @@ def find_email_subscriptions(email):
 
     return subscriptions
 
+def get_subscription_filter_policy(subscription_arn):
+    response = sns.get_subscription_attributes(
+        SubscriptionArn=subscription_arn
+    )
+
+    attributes = response.get("Attributes", {})
+    filter_policy = attributes.get("FilterPolicy")
+
+    if not filter_policy:
+        return None
+
+    return json.loads(filter_policy)
+
+def subscription_filter_matches(subscription_arn, animal_tags):
+    policy = get_subscription_filter_policy(subscription_arn)
+
+    if not isinstance(policy, dict):
+        return False
+
+    configured_tags = policy.get("animal_tags")
+
+    if not isinstance(configured_tags, list):
+        return False
+
+    return set(configured_tags) == set(animal_tags)
+
 def lambda_handler(event, context):
     claims = (
         event.get("requestContext", {})
@@ -116,6 +142,32 @@ def lambda_handler(event, context):
         expires_at = existing.get("expires_at", 0)
 
         if expires_at <= int(time.time()):
+            subscriptions = find_email_subscriptions(email)
+
+            confirmed = [
+                subscription
+                for subscription in subscriptions
+                if subscription.get("SubscriptionArn", "").startswith(
+                    "arn:aws:sns:"
+                )
+            ]
+
+            if confirmed:
+                for subscription in confirmed:
+                    subscription_arn = subscription["SubscriptionArn"]
+
+                    if subscription_filter_matches(
+                        subscription_arn,
+                        animal_tags
+                    ):
+                        return api_response(409, {
+                            "error": "An SNS subscription with matching filters already exists"
+                        })
+
+                return api_response(409, {
+                    "error": "An SNS subscription exists but its filters do not match"
+                })
+
             return api_response(409, {
                 "error": "Subscription expired; reconciliation required"
             })

@@ -5,7 +5,9 @@ import pytest
 with patch("boto3.client"), patch("boto3.resource"):
     from notifications_subscribe.handler import (
     lambda_handler,
-    find_email_subscriptions
+    find_email_subscriptions, 
+    get_subscription_filter_policy, 
+     subscription_filter_matches
 )
 
 
@@ -322,7 +324,8 @@ def test_expired_pending_subscription(
 
     result = lambda_handler(event, None)
 
-    assert result["statusCode"] != 409
+    assert result["statusCode"] == 409
+    mock_sns.subscribe.assert_not_called()
 
 @patch("notifications_subscribe.handler.dynamodb")
 @patch("notifications_subscribe.handler.sns")
@@ -431,3 +434,144 @@ def test_find_confirmed_email_subscription(mock_sns):
 
     assert len(confirmed) == 1
     assert confirmed[0]["SubscriptionArn"] == "arn:subscription-123"
+
+@patch("notifications_subscribe.handler.sns")
+def test_confirmed_subscription_has_valid_arn(mock_sns):
+    mock_paginator = mock_sns.get_paginator.return_value
+
+    mock_paginator.paginate.return_value = [
+        {
+            "Subscriptions": [
+                {
+                    "Protocol": "email",
+                    "Endpoint": "test@example.com",
+                    "SubscriptionArn": (
+                        "arn:aws:sns:ap-southeast-2:123456789012:"
+                        "ecoguard-animal-notifications:abc123"
+                    )
+                }
+            ]
+        }
+    ]
+
+    subscriptions = find_email_subscriptions("test@example.com")
+
+    assert len(subscriptions) == 1
+    assert subscriptions[0]["SubscriptionArn"].startswith(
+        "arn:aws:sns:"
+    )
+
+@patch("notifications_subscribe.handler.time.time", return_value=2000000)
+@patch("notifications_subscribe.handler.find_email_subscriptions")
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_expired_pending_with_confirmed_sns_returns_409(
+    mock_sns, mock_dynamodb, mock_find, mock_time
+):
+    mock_table = mock_dynamodb.Table.return_value
+
+    mock_table.get_item.return_value = {
+        "Item": {
+            "user_id": "test-user-123",
+            "email": "test@example.com",
+            "animal_tags": ["fox"],
+            "status": "pending",
+            "expires_at": 1000000
+        }
+    }
+
+    mock_find.return_value = [
+        {
+            "Protocol": "email",
+            "Endpoint": "test@example.com",
+            "SubscriptionArn": "arn:aws:sns:region:account:topic:abc123"
+        }
+    ]
+
+    mock_sns.get_subscription_attributes.return_value = {
+        "Attributes": {
+            "FilterPolicy": json.dumps({
+                "animal_tags": ["fox"]
+                })
+            }
+        }
+
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["koala"]
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 409
+    mock_find.assert_called_once_with("test@example.com")
+    mock_sns.subscribe.assert_not_called()
+    mock_table.put_item.assert_not_called()
+
+@patch("notifications_subscribe.handler.sns")
+def test_get_subscription_filter_policy(mock_sns):
+    mock_sns.get_subscription_attributes.return_value = {
+        "Attributes": {
+            "FilterPolicy": json.dumps({
+                "animal_tags": ["fox", "koala"]
+            })
+        }
+    }
+
+    result = get_subscription_filter_policy(
+        "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123"
+    )
+
+    assert result == {
+        "animal_tags": ["fox", "koala"]
+    }
+
+    mock_sns.get_subscription_attributes.assert_called_once()
+
+@patch("notifications_subscribe.handler.sns")
+def test_get_subscription_filter_policy_missing(mock_sns):
+    mock_sns.get_subscription_attributes.return_value = {
+        "Attributes": {}
+    }
+
+    result = get_subscription_filter_policy(
+        "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123"
+    )
+
+    assert result is None
+
+@patch("notifications_subscribe.handler.get_subscription_filter_policy")
+def test_subscription_filter_matches(mock_get_policy):
+    mock_get_policy.return_value = {
+        "animal_tags": ["fox", "koala"]
+    }
+
+    result = subscription_filter_matches(
+        "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123",
+        ["koala", "fox"]
+    )
+
+    assert result is True
+
+@patch("notifications_subscribe.handler.get_subscription_filter_policy")
+def test_subscription_filter_does_not_match(mock_get_policy):
+    mock_get_policy.return_value = {
+        "animal_tags": ["fox"]
+    }
+
+    result = subscription_filter_matches(
+        "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123",
+        ["koala"]
+    )
+
+    assert result is False
