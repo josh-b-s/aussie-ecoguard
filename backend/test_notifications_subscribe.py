@@ -40,7 +40,16 @@ def test_verified_email_is_accepted(mock_sns, mock_dynamodb):
     assert kwargs["Endpoint"] == "test@example.com"
     assert kwargs["ReturnSubscriptionArn"] is True
 
-    assert "Attributes" not in kwargs
+    assert kwargs["Attributes"]["FilterPolicyScope"] == "MessageAttributes"
+
+    filter_policy = json.loads(
+        kwargs["Attributes"]["FilterPolicy"]
+    )
+
+    assert filter_policy == {
+        "animal_tags": ["fox", "koala"]
+    }
+    
     mock_dynamodb.Table.assert_called_once()
 
     mock_dynamodb.Table.return_value.put_item.assert_called_once_with(
