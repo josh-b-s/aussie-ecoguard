@@ -1,7 +1,7 @@
 
 import json
 import os
-
+import time
 import boto3
 from botocore.exceptions import ClientError
 
@@ -107,7 +107,8 @@ def lambda_handler(event, context):
                 "user_id": user_id,
                 "email": email,
                 "animal_tags": animal_tags,
-                "status": "pending"
+                "status": "pending",
+                "expires_at": int(time.time()) + 86400
             },
             ConditionExpression="attribute_not_exists(user_id)"
         )
