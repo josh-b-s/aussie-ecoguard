@@ -283,3 +283,40 @@ def test_more_than_20_animal_tags_are_rejected(
 
     mock_sns.subscribe.assert_not_called()
     mock_dynamodb.Table.assert_not_called()
+
+@patch("notifications_subscribe.handler.time.time", return_value=2000000)
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_expired_pending_subscription(
+    mock_sns, mock_dynamodb, mock_time
+):
+    mock_table = mock_dynamodb.Table.return_value
+
+    mock_table.get_item.return_value = {
+        "Item": {
+            "user_id": "test-user-123",
+            "email": "test@example.com",
+            "animal_tags": ["fox"],
+            "status": "pending",
+            "expires_at": 1000000
+        }
+    }
+
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["koala"]
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] != 409
