@@ -159,7 +159,25 @@ def lambda_handler(event, context):
         )
         raise
 
+    subscription_arn = response.get("SubscriptionArn")
+
+    if subscription_arn and subscription_arn != "pending confirmation":
+        table.update_item(
+            Key={"user_id": user_id},
+            UpdateExpression="SET subscription_arn = :arn",
+            ConditionExpression="#status = :pending",
+            ExpressionAttributeNames={
+                "#status": "status"
+            },
+            ExpressionAttributeValues={
+                ":arn": subscription_arn,
+                ":pending": "pending"
+            }
+        )
+
     return api_response(202, {
         "message": "Check your email to confirm the subscription",
         "subscription_arn": response.get("SubscriptionArn")
     })
+
+    
