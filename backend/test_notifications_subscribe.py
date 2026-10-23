@@ -398,3 +398,36 @@ def test_find_email_subscriptions(mock_sns):
     mock_sns.get_paginator.assert_called_once_with(
         "list_subscriptions_by_topic"
     )
+
+@patch("notifications_subscribe.handler.sns")
+def test_find_confirmed_email_subscription(mock_sns):
+    mock_paginator = mock_sns.get_paginator.return_value
+
+    mock_paginator.paginate.return_value = [
+        {
+            "Subscriptions": [
+                {
+                    "Protocol": "email",
+                    "Endpoint": "test@example.com",
+                    "SubscriptionArn": "arn:subscription-123"
+                },
+                {
+                    "Protocol": "email",
+                    "Endpoint": "test@example.com",
+                    "SubscriptionArn": "PendingConfirmation"
+                }
+            ]
+        }
+    ]
+
+    subscriptions = find_email_subscriptions("test@example.com")
+
+    confirmed = [
+        subscription
+        for subscription in subscriptions
+        if subscription.get("SubscriptionArn")
+        not in ("PendingConfirmation", "pending confirmation")
+    ]
+
+    assert len(confirmed) == 1
+    assert confirmed[0]["SubscriptionArn"] == "arn:subscription-123"
