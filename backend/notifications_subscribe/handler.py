@@ -232,7 +232,10 @@ def lambda_handler(event, context):
 
     subscription_arn = response.get("SubscriptionArn")
 
-    if subscription_arn and subscription_arn != "pending confirmation":
+    if (
+    isinstance(subscription_arn, str)
+    and subscription_arn.startswith("arn:aws:sns:")
+    ):
         table.update_item(
             Key={"user_id": user_id},
             UpdateExpression="SET subscription_arn = :arn",
