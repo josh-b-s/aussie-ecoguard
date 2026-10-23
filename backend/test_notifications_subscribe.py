@@ -247,3 +247,37 @@ def test_cors_headers_are_returned():
     )
 
     assert result["headers"]["Content-Type"] == "application/json"
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_more_than_20_animal_tags_are_rejected(
+    mock_sns, mock_dynamodb
+):
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": [
+                f"animal-{i}" for i in range(21)
+            ]
+        })
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 400
+
+    body = json.loads(result["body"])
+    assert body["error"] == (
+        "A maximum of 20 animal tags is allowed"
+    )
+
+    mock_sns.subscribe.assert_not_called()
+    mock_dynamodb.Table.assert_not_called()
