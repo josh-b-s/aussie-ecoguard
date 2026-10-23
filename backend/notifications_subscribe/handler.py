@@ -112,7 +112,13 @@ def lambda_handler(event, context):
             TopicArn=SNS_TOPIC_ARN,
             Protocol="email",
             Endpoint=email,
-            ReturnSubscriptionArn=True
+            ReturnSubscriptionArn=True,
+            Attributes={
+                "FilterPolicy": json.dumps({
+                    "animal_tags": animal_tags
+                }),
+                "FilterPolicyScope": "MessageAttributes"
+            }
         )
     except Exception:
         table.delete_item(
