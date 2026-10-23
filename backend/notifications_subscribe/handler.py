@@ -11,6 +11,21 @@ SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
 dynamodb = boto3.resource("dynamodb")
 SUBSCRIPTIONS_TABLE = os.environ.get("SUBSCRIPTIONS_TABLE")
 
+FRONTEND_ORIGIN = os.environ.get(
+    "FRONTEND_ORIGIN",
+    "http://localhost:5173"
+)
+
+
+def api_response(status_code, body):
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Access-Control-Allow-Origin": FRONTEND_ORIGIN,
+            "Content-Type": "application/json"
+        },
+        "body": json.dumps(body)
+    }
 
 def lambda_handler(event, context):
     claims = (
