@@ -7,7 +7,8 @@ with patch("boto3.client"), patch("boto3.resource"):
     lambda_handler,
     find_email_subscriptions, 
     get_subscription_filter_policy, 
-     subscription_filter_matches
+    subscription_filter_matches, 
+    is_subscription_confirmed
 )
 
 
@@ -572,6 +573,34 @@ def test_subscription_filter_does_not_match(mock_get_policy):
     result = subscription_filter_matches(
         "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123",
         ["koala"]
+    )
+
+    assert result is False
+
+@patch("notifications_subscribe.handler.sns")
+def test_is_subscription_confirmed(mock_sns):
+    mock_sns.get_subscription_attributes.return_value = {
+        "Attributes": {
+            "PendingConfirmation": "false"
+        }
+    }
+
+    result = is_subscription_confirmed(
+        "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123"
+    )
+
+    assert result is True
+
+@patch("notifications_subscribe.handler.sns")
+def test_is_subscription_not_confirmed(mock_sns):
+    mock_sns.get_subscription_attributes.return_value = {
+        "Attributes": {
+            "PendingConfirmation": "true"
+        }
+    }
+
+    result = is_subscription_confirmed(
+        "arn:aws:sns:ap-southeast-2:123456789012:topic:abc123"
     )
 
     assert result is False

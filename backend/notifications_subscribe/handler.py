@@ -72,6 +72,21 @@ def subscription_filter_matches(subscription_arn, animal_tags):
 
     return set(configured_tags) == set(animal_tags)
 
+def is_subscription_confirmed(subscription_arn):
+    if not (
+        isinstance(subscription_arn, str)
+        and subscription_arn.startswith("arn:aws:sns:")
+    ):
+        return False
+
+    response = sns.get_subscription_attributes(
+        SubscriptionArn=subscription_arn
+    )
+
+    attributes = response.get("Attributes", {})
+
+    return attributes.get("PendingConfirmation") == "false"
+
 def lambda_handler(event, context):
     claims = (
         event.get("requestContext", {})
@@ -155,6 +170,11 @@ def lambda_handler(event, context):
             if confirmed:
                 for subscription in confirmed:
                     subscription_arn = subscription["SubscriptionArn"]
+
+                    if not is_subscription_confirmed(subscription_arn):
+                        return api_response(409, {
+                            "error": "SNS subscription is awaiting confirmation"
+                        })
 
                     if subscription_filter_matches(
                         subscription_arn,
