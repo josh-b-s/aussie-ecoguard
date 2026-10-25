@@ -110,18 +110,21 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"error": "Invalid JSON body"})
-        }
+        return api_response(400, {
+            "error": "Invalid JSON body"
+        })
 
     if not isinstance(body, dict):
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"error": "Invalid request body"})
-        }
+        return api_response(400, {
+            "error": "Invalid request body"
+        })
 
     animal_tags = body.get("animal_tags")
+
+    if len(animal_tags) > 20:
+        return api_response(400, {
+            "error": "A maximum of 20 animal tags is allowed"
+        })
 
     if (
         not isinstance(animal_tags, list)
@@ -131,20 +134,8 @@ def lambda_handler(event, context):
             for tag in animal_tags
         )
     ):
-        return {
-            "statusCode": 400,
-            "body": json.dumps({
-                "error": "animal_tags must be a non-empty list of strings"
-            })
-        }
-
-    animal_tags = sorted({
-        tag.strip().lower() for tag in animal_tags
-    })
-
-    if len(animal_tags) > 20:
         return api_response(400, {
-            "error": "A maximum of 20 animal tags is allowed"
+            "error": "animal_tags must be a non-empty list of strings"
         })
 
     table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
@@ -213,12 +204,9 @@ def lambda_handler(event, context):
             error.response["Error"]["Code"]
             == "ConditionalCheckFailedException"
         ):
-            return {
-                "statusCode": 409,
-                "body": json.dumps({
-                    "error": "A subscription already exists"
-                })
-            }
+            return api_response(409, {
+                "error": "A subscription already exists"
+            })
         raise
 
     try:
