@@ -121,11 +121,7 @@ def lambda_handler(event, context):
 
     animal_tags = body.get("animal_tags")
 
-    if len(animal_tags) > 20:
-        return api_response(400, {
-            "error": "A maximum of 20 animal tags is allowed"
-        })
-
+    # 1. Validate the input first
     if (
         not isinstance(animal_tags, list)
         or not animal_tags
@@ -136,6 +132,17 @@ def lambda_handler(event, context):
     ):
         return api_response(400, {
             "error": "animal_tags must be a non-empty list of strings"
+        })
+
+    # 2. Normalise and remove duplicates
+    animal_tags = sorted({
+        tag.strip().lower() for tag in animal_tags
+    })
+
+    # 3. Check the limit after normalisation
+    if len(animal_tags) > 20:
+        return api_response(400, {
+            "error": "A maximum of 20 animal tags is allowed"
         })
 
     table = dynamodb.Table(SUBSCRIPTIONS_TABLE)

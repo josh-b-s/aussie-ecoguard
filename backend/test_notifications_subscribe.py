@@ -604,3 +604,68 @@ def test_is_subscription_not_confirmed(mock_sns):
     )
 
     assert result is False
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_missing_animal_tags_returns_400(mock_sns, mock_dynamodb):
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({})
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 400
+    assert result["headers"]["Access-Control-Allow-Origin"]
+    mock_sns.subscribe.assert_not_called()
+    mock_dynamodb.Table.assert_not_called()
+
+@patch("notifications_subscribe.handler.dynamodb")
+@patch("notifications_subscribe.handler.sns")
+def test_animal_tags_are_normalised(mock_sns, mock_dynamodb):
+    event = {
+        "requestContext": {
+            "authorizer": {
+                "claims": {
+                    "sub": "test-user-123",
+                    "email": "test@example.com",
+                    "email_verified": "true"
+                }
+            }
+        },
+        "body": json.dumps({
+            "animal_tags": ["Fox", " fox ", "KOALA"]
+        })
+    }
+
+    mock_dynamodb.Table.return_value.get_item.return_value = {}
+
+    mock_sns.subscribe.return_value = {
+        "SubscriptionArn": "pending confirmation"
+    }
+
+    result = lambda_handler(event, None)
+
+    assert result["statusCode"] == 202
+
+    # Verify normalised tags are saved
+    saved_item = mock_dynamodb.Table.return_value.put_item.call_args.kwargs["Item"]
+    assert saved_item["animal_tags"] == ["fox", "koala"]
+
+    # Verify SNS receives the normalised tags
+    subscribe_args = mock_sns.subscribe.call_args.kwargs
+    filter_policy = json.loads(
+        subscribe_args["Attributes"]["FilterPolicy"]
+    )
+
+    assert filter_policy == {
+        "animal_tags": ["fox", "koala"]
+    }
