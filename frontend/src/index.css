@@ -84,3 +84,98 @@ button:focus-visible {
     font-size: 30px;
   }
 }
+
+
+.dashboard-layout {
+  max-width: 1100px;
+  min-height: 75vh;
+  text-align: left;
+}
+
+.dashboard-layout button {
+  width: auto;
+  min-width: 120px;
+}
+
+@media (max-width: 600px) {
+  .dashboard-layout {
+    padding: 24px;
+    min-height: 85vh;
+  }
+}
+
+
+.dashboard-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 28px 0;
+}
+
+.dashboard-layout .dashboard-nav button {
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+  padding: 12px 18px;
+  background: #edf5ef;
+  color: #286747;
+  border: 1px solid #d4e8d9;
+}
+
+.dashboard-layout .dashboard-nav button:hover {
+  background: #dceee1;
+}
+
+.dashboard-layout .dashboard-nav button.active {
+  background: #218454;
+  color: white;
+}
+
+.dashboard-panel {
+  padding: 28px;
+  background: #f5faf6;
+  border: 1px solid #dcece0;
+  border-radius: 14px;
+}
+
+.dashboard-panel h2 {
+  margin-bottom: 12px;
+}
+
+.search-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 450px;
+  margin-top: 24px;
+}
+
+.search-form label {
+  font-weight: 600;
+  color: #286747;
+}
+
+.search-form input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbded0;
+  border-radius: 8px;
+  font: inherit;
+  color: #1c352b;
+  background: white;
+}
+
+.search-form form button {
+  align-self: flex-start;
+  width: auto;
+  margin-top: 12px;
+}
+
+.search-result {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #dcece0;
+  border-radius: 12px;
+}
+
