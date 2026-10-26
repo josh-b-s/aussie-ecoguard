@@ -4,3 +4,4 @@ PyJWT[crypto]>=2.8
 requests>=2.31
 pillow>=10.3
 google-cloud-vision>=3.7
+google-cloud-dialogflow>=2.30

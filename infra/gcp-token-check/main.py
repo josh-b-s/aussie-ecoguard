@@ -15,10 +15,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from auth import get_current_user
+from chat import router as chat_router
 from match import router as match_router
 
 app = FastAPI(title="EcoGuard GCP API")
 app.include_router(match_router)
+app.include_router(chat_router)
 
 
 @app.exception_handler(RequestValidationError)
