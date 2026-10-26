@@ -8,6 +8,7 @@ involved: only the pool ID, region and app client ID (all public values).
 - `main.py`: example service. `/health` is public, `/me` and `/match` are protected.
 - `match.py`, `features.py`, `urlcheck.py`: lost-pet matching (`POST /match`, see below).
 - `test_match.py`: offline tests for `/match` (no network, no Cloud Vision).
+- `chat.py`, `test_chat.py`: chatbot route `POST /chat` (Dialogflow ES) and its offline tests.
 - `test_auth.py`: offline tests (valid ID/access token, expired, wrong issuer/client/signature, alg=none, garbage).
 
 ## Run tests locally
@@ -84,3 +85,29 @@ Keep test loops small.
 
 Setup: enable the Vision API (see Deploy). If the first call returns 403, grant the service
 account `roles/serviceusage.serviceUsageConsumer`.
+
+## POST /chat (chatbot)
+The frontend sends the user's message with their Cognito ID token (`Authorization: Bearer <ID token>`).
+Cloud Run verifies the token, then calls the Dialogflow ES agent with its own service account, so the
+browser never holds a Google key.
+
+Request: `{"message": "show me foxes"}` (1 to 256 characters).
+Response 200:
+```json
+{"reply": "<agent's fulfillment text>", "intent": "<intent display name or null>",
+ "confidence": 0.93, "parameters": {"animal": ["fox"]}}
+```
+Errors: 400 bad message, 401 bad or missing token, 502 Dialogflow failed.
+
+The Dialogflow session id is the user's Cognito `sub`, taken from the verified token, so users cannot
+read or continue each other's conversations. The frontend uses `intent` and `parameters` to decide what
+to do next (for example, call the AWS tag search with `parameters.animal`).
+
+Setup: the agent lives in project `ecoguard-g11-14145` (override with `DIALOGFLOW_PROJECT_ID`,
+`DIALOGFLOW_LANGUAGE`). Grant the service account the Dialogflow API Client role:
+```
+gcloud services enable dialogflow.googleapis.com
+gcloud projects add-iam-policy-binding ecoguard-g11-14145 \
+  --member=serviceAccount:ecoguard-api-sa@ecoguard-g11-14145.iam.gserviceaccount.com \
+  --role=roles/dialogflow.client
+```
