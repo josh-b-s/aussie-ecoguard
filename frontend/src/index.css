@@ -179,3 +179,53 @@ button:focus-visible {
   border-radius: 12px;
 }
 
+.detected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 24px;
+}
+
+.detected-tag {
+  background: #dceee1;
+  color: #286747;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.media-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.media-type-badge,
+.media-tag-badge,
+.media-empty-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.media-type-badge {
+  background: #e8edf1;
+  color: #364956;
+}
+
+.media-tag-badge {
+  background: #dceee1;
+  color: #286747;
+}
+
+.media-empty-badge {
+  background: #f0f0ed;
+  color: #667068;
+}
+
+

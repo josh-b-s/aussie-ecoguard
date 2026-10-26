@@ -1,6 +1,9 @@
 
 import { useState } from 'react'
 import { searchByTags } from './searchApi.js'
+import ThumbnailLookup from './ThumbnailLookup.jsx'
+import ImageSearch from './ImageSearch.jsx'
+import MediaBadges from './MediaBadges.jsx'
 
 function Search({ idToken }) {
   const [species, setSpecies] = useState('')
@@ -122,6 +125,21 @@ try {
           {isSearching ? 'Searching...' : 'Search Animals'}
         </button>
       </form>
+      
+<ThumbnailLookup
+  key={
+    results?.results?.length === 1
+      ? results.results[0].thumbnail_url
+      : 'empty'
+  }
+  idToken={idToken}
+  initialThumbnailUrl={
+    results?.results?.length === 1
+      ? results.results[0].thumbnail_url || ''
+      : ''
+  }
+/>
+<ImageSearch idToken={idToken} />
 
       {error && <p role="alert">{error}</p>}
 
@@ -151,13 +169,7 @@ try {
       </a>
     )}
 
-    <p>
-      <strong>Type:</strong> {file.file_type}
-    </p>
-
-    <p>
-      <strong>Tags:</strong> {JSON.stringify(file.tags)}
-    </p>
+    <MediaBadges file={file} />
 
     {!file.thumbnail_url && file.original_url && (
       <a
