@@ -31,6 +31,15 @@ Globals:
         BUCKET: !Ref ExistingBucketName
 
 Resources:
+  NotificationsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ecoguard-notifications-dlq
+      MessageRetentionPeriod: 1209600
+  AnimalNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ecoguard-animal-notifications
 # Existing API Gateway configuration
   BackendApi:
     Type: AWS::Serverless::Api
@@ -123,6 +132,17 @@ Resources:
         AttributeName: expires_at
         Enabled: true
   
+  NotificationSubscriptionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+    
  
   SearchUploadInitFunction:
     Type: AWS::Serverless::Function
@@ -201,6 +221,86 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/search/upload
             Method: post
+
+  NotificationsSubscribeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Manage animal notification email subscriptions
+      CodeUri: notifications_subscribe/
+      Handler: handler.lambda_handler
+      Timeout: 15
+      MemorySize: 128
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref AnimalNotificationsTopic
+          SUBSCRIPTIONS_TABLE: !Ref NotificationSubscriptionsTable
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt NotificationSubscriptionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sns:Subscribe
+                - sns:ListSubscriptionsByTopic
+                - sns:GetSubscriptionAttributes
+              Resource: !Ref AnimalNotificationsTopic
+      Events:
+        Subscribe:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /notifications/subscribe
+            Method: post
+
+  NotificationsStreamFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Events:
+        FilesTableStream:
+          Type: DynamoDB
+          Properties:
+            Stream: arn:aws:dynamodb:ap-southeast-2:853611856490:table/ecoguard-pipeline-FilesTable-7T9WJ72MHXFO/stream/2026-10-18T08:54:50.113
+            StartingPosition: LATEST
+            BatchSize: 1
+            Enabled: true
+            MaximumRetryAttempts: 3
+            MaximumRecordAgeInSeconds: 3600
+            DestinationConfig:
+              OnFailure:
+                Type: SQS
+                Destination: !GetAtt NotificationsDeadLetterQueue.Arn
+      CodeUri: notifications_stream/
+      Handler: handler.lambda_handler
+      Runtime: python3.12
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref AnimalNotificationsTopic
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AnimalNotificationsTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt NotificationsDeadLetterQueue.Arn
+
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+                - dynamodb:ListStreams
+              Resource:
+                - arn:aws:dynamodb:ap-southeast-2:853611856490:table/ecoguard-pipeline-FilesTable-7T9WJ72MHXFO/stream/*
 
 Outputs:
   # Existing output
