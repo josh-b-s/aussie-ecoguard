@@ -87,7 +87,33 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/search/tags
             Method: post
-
+  BulkTagEditFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Add or remove tags from multiple owned media files
+      CodeUri: bulk_tag_edit/
+      Handler: handler.handler
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE: !Ref ExistingTableName
+          BUCKET: !Ref ExistingBucketName
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+      Events:
+        BulkTagEdit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/tags/bulk
+            Method: post
    # New Search by Thumbnail Lambda
   SearchThumbnailFunction:
     Type: AWS::Serverless::Function
