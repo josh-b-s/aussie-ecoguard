@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import Upload from './Upload.jsx'
 import Search from './Search.jsx'
+import LostPets from './LostPets.jsx'
+
 const sections = {
   Overview: 'Manage your wildlife sightings and explore EcoGuard.',
   Upload: 'Upload images and videos of animal sightings.',
@@ -34,6 +36,7 @@ function Dashboard({ email, idToken }) {
 
       
 
+
 <div className="dashboard-panel">
   <h2>{activeSection}</h2>
 
@@ -41,11 +44,12 @@ function Dashboard({ email, idToken }) {
     <Upload idToken={idToken} />
   ) : activeSection === 'Search' ? (
     <Search idToken={idToken} />
+  ) : activeSection === 'Lost Pets' ? (
+    <LostPets />
   ) : (
     <p>{sections[activeSection]}</p>
   )}
 </div>
-
     </section>
   )
 }

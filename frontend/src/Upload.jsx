@@ -81,80 +81,118 @@ async function handleUpload() {
   }
 }
 
+
   return (
     <div className="upload-form">
-      <p>
+      <p className="upload-description">
         Upload an image or video of an animal sighting.
         EcoGuard will automatically detect animal species.
       </p>
 
-      <label htmlFor="media-file">Choose a file</label>
+      <div className="upload-card">
+        <div className="upload-file-section">
+          <label className="upload-field-label" htmlFor="media-file">
+            Select your media
+          </label>
 
-      <input
-        id="media-file"
-        type="file"
-        accept=".jpg,.jpeg,.png,.mp4,.mov"
-        onChange={handleFileChange}
-      />
-
-      {selectedFile && (
-        <div>
-          <p>
-            <strong>Selected file:</strong> {selectedFile.name}
+          <p className="upload-helper">
+            Supported formats: JPG, PNG, MP4 and MOV
           </p>
 
-          <p>
-            <strong>Size:</strong>{' '}
-            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-          </p>
+          <input
+            id="media-file"
+            type="file"
+            accept=".jpg,.jpeg,.png,.mp4,.mov"
+            onChange={handleFileChange}
+            className="upload-file-input"
+          />
 
-          <button
-            type="button"
-            onClick={calculateChecksum}
-            disabled={isHashing}
-          >
-            {isHashing ? 'Calculating...' : 'Calculate SHA-256'}
-          </button>
+          <label htmlFor="media-file" className="upload-file-button">
+            Choose File
+          </label>
+
+          <span className="upload-file-name">
+            {selectedFile ? selectedFile.name : 'No file selected'}
+          </span>
         </div>
-      )}
 
-      {checksum && (
-        <div>
-          <p><strong>SHA-256 checksum:</strong></p>
-          <p style={{ overflowWrap: 'anywhere' }}>
-            {checksum}
+        {selectedFile && (
+          <div className="upload-file-details">
+            <span className="upload-detail-badge">
+              {selectedFile.type.startsWith('image/')
+                ? '📷 Image'
+                : '🎬 Video'}
+            </span>
+
+            <span className="upload-detail-badge">
+              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+            </span>
+          </div>
+        )}
+
+        <div className="upload-privacy-section">
+          <label className="upload-checkbox-label">
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(event) => setIsPrivate(event.target.checked)}
+            />
+            <span>Keep this upload private</span>
+          </label>
+
+          <p className="upload-helper">
+            {isPrivate
+              ? 'Only you can access this sighting.'
+              : 'This sighting can appear in public searches.'}
           </p>
         </div>
-      )}
-        
-{selectedFile && (
-  <button
-    type="button"
-    onClick={handleUpload}
-    disabled={!checksum || isUploading || isHashing}
-  >
-    {isUploading ? 'Uploading...' : 'Upload to EcoGuard'}
-  </button>
-)}
 
-{uploadMessage && (
-  <p role="status">{uploadMessage}</p>
-)}
+        {selectedFile && (
+          <div className="upload-actions">
+            <button
+              type="button"
+              onClick={calculateChecksum}
+              disabled={isHashing || isUploading}
+              className="upload-secondary-action"
+            >
+              {isHashing ? 'Calculating...' : 'Calculate SHA-256'}
+            </button>
 
-      {error && <p role="alert">{error}</p>}
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={!checksum || isUploading || isHashing}
+              className="upload-primary-action"
+            >
+              {isUploading ? 'Uploading...' : 'Upload to EcoGuard'}
+            </button>
+          </div>
+        )}
 
-      <label>
-        <input
-          type="checkbox"
-          checked={isPrivate}
-          onChange={(event) => setIsPrivate(event.target.checked)}
-        />
-        Keep this upload private
-      </label>
+        {checksum && (
+          <div className="upload-checksum-box">
+            <strong>SHA-256 Checksum</strong>
+            <p style={{ overflowWrap: 'anywhere' }}>
+              {checksum}
+            </p>
+          </div>
+        )}
 
-      <p>Visibility: {isPrivate ? 'Private' : 'Public'}</p>
+        {uploadMessage && (
+          <p className="upload-success" role="status">
+            {uploadMessage}
+          </p>
+        )}
+
+        {error && (
+          <p className="upload-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
 
 export default Upload
+
