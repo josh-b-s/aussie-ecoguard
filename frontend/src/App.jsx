@@ -13,7 +13,7 @@ function App() {
 
     const logoutUrl = new URL(`${cognitoDomain}/logout`)
     logoutUrl.searchParams.set('client_id', clientId)
-    logoutUrl.searchParams.set('logout_uri', 'http://localhost:5173')
+    logoutUrl.searchParams.set('logout_uri', window.location.origin)
 
     window.location.assign(logoutUrl.toString())
   }

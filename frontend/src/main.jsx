@@ -8,7 +8,7 @@ import './index.css'
 const cognitoConfig = {
   authority: 'https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_WI1ngaH1k',
   client_id: '5tv0jne3t88vcrc5408vrtnl6s',
-  redirect_uri: 'http://localhost:5173',
+  redirect_uri: window.location.origin,
   response_type: 'code',
   scope: 'openid email',
   onSigninCallback: () => {

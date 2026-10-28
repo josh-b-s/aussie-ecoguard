@@ -4,6 +4,7 @@ import Upload from './Upload.jsx'
 import Search from './Search.jsx'
 import LostPets from './LostPets.jsx'
 import Notifications from './Notifications.jsx'
+import Chatbot from './Chatbot.jsx'
 
 const sections = {
   Overview: 'Manage your wildlife sightings and explore EcoGuard.',
@@ -50,6 +51,8 @@ function Dashboard({ email, idToken }) {
     <LostPets />
   ) : activeSection === 'Notifications' ? (
     <Notifications idToken={idToken} />
+  ) : activeSection === 'Chatbot' ? (
+    <Chatbot idToken={idToken} />
   ) : (
     <p>{sections[activeSection]}</p>
   )}
