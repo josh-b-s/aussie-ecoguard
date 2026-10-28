@@ -19,7 +19,7 @@ Parameters:
 
   FrontendOrigin:
     Type: String
-    Default: "http://localhost:5173"
+    Default: https://ecoguard-g11-14145.web.app
 
 Globals:
   Function:
