@@ -114,7 +114,7 @@ Stack name `ecoguard-pipeline`, region `ap-southeast-2`. Parameters:
 
 - `BucketName`: globally unique bucket name
 - `UserPoolArn`: ARN of the Cognito user pool
-- `FrontendOrigin`: allowed CORS origin, default `http://localhost:5173`
+- `FrontendOrigin`: origin allowed to call the API, default the hosted site `https://ecoguard-g11-14145.web.app`. The bucket also allows `http://localhost:5173` for local development; the API's CORS allows only `FrontendOrigin`
 - `ConfigParamName`: default `/ecoguard/model-config`
 
 Later deploys: `sam build && sam deploy`. Stack outputs (API URL, bucket, table):

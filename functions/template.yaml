@@ -11,7 +11,7 @@ Parameters:
     Description: ARN of the Cognito user pool that signs users in
   FrontendOrigin:
     Type: String
-    Default: http://localhost:5173
+    Default: https://ecoguard-g11-14145.web.app
   ConfigParamName:
     Type: String
     Default: /ecoguard/model-config
@@ -71,7 +71,7 @@ Resources:
         RestrictPublicBuckets: true
       CorsConfiguration:
         CorsRules:
-          - AllowedOrigins: [!Ref FrontendOrigin]
+          - AllowedOrigins: [!Ref FrontendOrigin, http://localhost:5173]
             AllowedMethods: [GET, PUT, HEAD]
             AllowedHeaders: ["*"]
             ExposedHeaders: [ETag]
