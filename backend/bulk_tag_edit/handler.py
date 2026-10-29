@@ -224,6 +224,11 @@ def handler(event, context):
             return response(400, {
                 "error": "Provide a non-empty list of tags."
             })
+        # Normalise tags to match search and subscriptions.
+        tags = list(dict.fromkeys(
+            tag.strip().lower()
+            for tag in tags
+        ))
 
         if type(operation) is not int or operation not in (0, 1):
             return response(400, {
