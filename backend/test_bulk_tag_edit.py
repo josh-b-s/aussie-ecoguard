@@ -206,3 +206,24 @@ def test_bulk_tag_edit_normalises_tags():
                     ["cat", "dog"],
                     1
                 )
+
+def test_response_serializes_decimal_values():
+    import json
+    from decimal import Decimal
+    from bulk_tag_edit.handler import response
+
+    result = response(200, {
+        "tags": {
+            "cat": Decimal("1"),
+            "animal": Decimal("1"),
+            "confidence": Decimal("0.95")
+        }
+    })
+
+    assert result["statusCode"] == 200
+
+    body = json.loads(result["body"])
+
+    assert body["tags"]["cat"] == 1
+    assert body["tags"]["animal"] == 1
+    assert body["tags"]["confidence"] == 0.95

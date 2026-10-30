@@ -35,3 +35,4 @@ assert any(
 ), "Missing lowercase normalisation"
 
 print("Validation checks found.")
+
