@@ -200,6 +200,7 @@ def handler(event, context):
         if (
             not isinstance(urls, list)
             or not urls
+            or len(urls) > 50
             or not all(
                 isinstance(url, str) and url.strip()
                 for url in urls
@@ -212,14 +213,22 @@ def handler(event, context):
         if (
             not isinstance(tags, list)
             or not tags
+            or len(tags) > 20
             or not all(
-                isinstance(tag, str) and tag.strip()
+                isinstance(tag, str)
+                and tag.strip()
+                and len(tag.strip()) <= 50
                 for tag in tags
             )
         ):
             return response(400, {
                 "error": "Provide a non-empty list of tags."
             })
+        # Normalise tags to match search and subscriptions.
+        tags = list(dict.fromkeys(
+            tag.strip().lower()
+            for tag in tags
+        ))
 
         if type(operation) is not int or operation not in (0, 1):
             return response(400, {
