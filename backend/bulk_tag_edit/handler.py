@@ -26,7 +26,12 @@ def response(status, body):
             "Access-Control-Allow-Origin": FRONTEND_ORIGIN,
             "Vary": "Origin"
         },
-        "body": json.dumps(body)
+        "body": json.dumps(
+            body,
+            default=lambda value: int(value) if isinstance(value, Decimal) and value == int(value)
+            else float(value) if isinstance(value, Decimal)
+            else str(value)
+        )
     }
 
 def extract_s3_key(url):
