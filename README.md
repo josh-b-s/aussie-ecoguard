@@ -130,10 +130,15 @@ python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\a
 pip install -r requirements.txt pytest httpx
 pytest -q
 
-# AWS backend (needs pytest and boto3 installed)
+# AWS backend (all AWS calls are mocked, no credentials needed)
 cd backend
-pytest -q
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install pytest boto3
+export AWS_DEFAULT_REGION=ap-southeast-2 TABLE=TestFilesTable BUCKET=test-bucket
+pytest -q                                              # PowerShell: $env:AWS_DEFAULT_REGION="ap-southeast-2"; $env:TABLE="TestFilesTable"; $env:BUCKET="test-bucket"
 ```
+
+Expected: 48 passed for Cloud Run, 69 passed for the backend. The region is needed because some handlers create boto3 clients when imported.
 
 ### Get a token
 
