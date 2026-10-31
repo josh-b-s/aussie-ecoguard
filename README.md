@@ -1,93 +1,175 @@
-# aussie-ecoguard
+# Aussie EcoGuard
 
+Group 11, FIT3184 Assignment 2. EcoGuard lets people upload photos and videos of pests and pets, tags the animals automatically, and lets them search, edit tags, get email alerts, find lost pets and ask a chatbot. It is serverless and runs on two clouds: **AWS** (storage, pipeline, ML tagging, APIs, user accounts) and **GCP** (Cloud Run API, Cloud Vision, Dialogflow ES, Firebase Hosting).
 
+## Live deployment
 
-## Getting started
+| Part | URL / ID |
+|---|---|
+| Web app (Firebase Hosting) | https://ecoguard-g11-14145.web.app |
+| Upload API (AWS, `ecoguard-pipeline`) | https://cz0bx6ka2i.execute-api.ap-southeast-2.amazonaws.com/prod |
+| Backend API (AWS, `ecoguard-backend`) | https://sn6wpy8jd9.execute-api.ap-southeast-2.amazonaws.com/prod |
+| Cloud Run API (GCP, `ecoguard-api`) | https://ecoguard-api-334103023207.australia-southeast1.run.app |
+| Cognito user pool | `ap-southeast-2_WI1ngaH1k`, web app client `ecoguard-web` (`5tv0jne3t88vcrc5408vrtnl6s`) |
+| AWS | region `ap-southeast-2` |
+| GCP project | `ecoguard-g11-14145`, region `australia-southeast1` |
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Architecture
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+<!-- Add the exported diagram here once it is in the repo, e.g. docs/architecture/ecoguard-architecture.png -->
 
 ```
-cd existing_repo
-git remote add origin https://git.infotech.monash.edu/fit3184-ecoguard/aussie-ecoguard.git
-git branch -M main
-git push -uf origin main
+Browser (React on Firebase Hosting)
+  |-- sign in ---------------------> Cognito (Hosted UI, ID token)
+  |-- AWS APIs (token in Authorization) --> API Gateway + Cognito authorizer --> Lambda --> DynamoDB / S3
+  |-- /chat, /match (Bearer token) ----------> Cloud Run --> Dialogflow ES / Cloud Vision
+
+Upload:  browser -> POST /upload/init -> presigned PUT -> S3 uploads/
+         S3 event -> SNS -> thumbnailer Lambda + tagger Lambda (Rekognition) -> DynamoDB FilesTable
+Alerts:  FilesTable stream -> notifications_stream Lambda -> SNS email (failures -> SQS dead-letter queue)
+Lost pet: Lambda picks recent public candidates, signs S3 URLs, calls Cloud Run /match with the user's token
 ```
 
-## Integrate with your tools
+Cross-cloud links (the two places AWS and GCP meet):
 
-* [Set up project integrations](https://git.infotech.monash.edu/fit3184-ecoguard/aussie-ecoguard/-/settings/integrations)
+1. **Identity.** Cognito issues the token. Cloud Run verifies it itself against the pool's public JWKS (RS256, checks `iss`, `exp`, `token_use` and the app client ID). No shared secret is stored on either cloud.
+2. **Images.** AWS gives Cloud Run short-lived presigned S3 GET URLs. Cloud Run only accepts HTTPS URLs on our bucket host under `search-temp/`, `thumbnails/` or `uploads/`, does not follow redirects, and holds no AWS credentials.
 
-## Collaborate with your team
+## Repository layout
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```
+frontend/             React + Vite app, deployed to Firebase Hosting
+functions/            AWS pipeline stack: upload init, thumbnails, tagging (Rekognition), detect Lambda
+backend/              AWS backend stack: search, bulk tag edit, delete, lost-pet search, notifications
+infra/gcp-token-check/  Cloud Run service (FastAPI): Cognito token check, /match, /chat
+```
 
-## Test and Deploy
+Each folder has its own README with details (`functions/README.md`, `infra/gcp-token-check/README.md`).
 
-Use the built-in continuous integration in GitLab.
+## API summary
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+| API | Route | Purpose |
+|---|---|---|
+| Upload | `POST /upload/init` | Dedup check and presigned upload URL |
+| Backend | `POST /media/search/tags` | Search by tags |
+| Backend | `POST /media/search/thumbnail` | Look up a file by its thumbnail |
+| Backend | `POST /media/search/upload/init`, `POST /media/search/upload` | Search by uploading an image |
+| Backend | `POST /media/search/lost-pet` | Lost-pet matching (calls Cloud Run `/match`) |
+| Backend | `POST /media/tags/bulk` | Bulk add or remove tags on your own files |
+| Backend | `DELETE /media/{file_id}` | Delete your own file (S3 objects and record) |
+| Backend | `POST /notifications/subscribe` | Subscribe an email to animal alerts |
+| Cloud Run | `GET /health` (public), `GET /me`, `POST /match`, `POST /chat` | Token check, image matching, chatbot |
 
-***
+**Token headers differ.** AWS API Gateway routes take the Cognito ID token as is: `Authorization: <id_token>`. Cloud Run needs `Authorization: Bearer <id_token>`. Always use the ID token from the web app client `ecoguard-web`; tokens from other app clients are rejected by Cloud Run (`aud` mismatch).
 
-# Editing this README
+## Deploy
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Prerequisites: AWS CLI, SAM CLI, gcloud, Node.js, Firebase CLI. Deploy in this order, because later parts need earlier outputs.
 
-## Suggestions for a good README
+### 1. AWS pipeline (`ecoguard-pipeline`)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```
+cd functions
+bash layers/build_opencv.sh
+sam build
+sam deploy --guided      # stack ecoguard-pipeline, region ap-southeast-2
+```
 
-## Name
-Choose a self-explaining name for your project.
+Parameters: `BucketName`, `UserPoolArn`, `FrontendOrigin` (default the Firebase site). Details in `functions/README.md`.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### 2. AWS backend (`ecoguard-backend`)
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```
+cd backend
+sam build
+sam deploy --guided      # stack ecoguard-backend, region ap-southeast-2
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Parameters (defaults point at the pipeline stack's table and bucket): `ExistingTableName`, `ExistingBucketName`, `UserPoolArn`, `FrontendOrigin`. After changing `FrontendOrigin`, make sure the API Gateway `prod` stage is redeployed, otherwise CORS keeps the old origin.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 3. GCP Cloud Run
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```
+cd infra/gcp-token-check
+gcloud config set project ecoguard-g11-14145
+gcloud run deploy ecoguard-api --source . --region australia-southeast1 \
+  --service-account ecoguard-api-sa@ecoguard-g11-14145.iam.gserviceaccount.com \
+  --allow-unauthenticated --min-instances 0 --memory 512Mi --timeout 60 \
+  --set-env-vars COGNITO_REGION=ap-southeast-2,COGNITO_USER_POOL_ID=ap-southeast-2_WI1ngaH1k,COGNITO_APP_CLIENT_ID=5tv0jne3t88vcrc5408vrtnl6s,ALLOWED_ORIGINS=http://localhost:5173,https://ecoguard-g11-14145.web.app
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+`--allow-unauthenticated` only skips Google identity checks. Every route except `/health` verifies the Cognito token in code. The service account `ecoguard-api-sa` has only `roles/dialogflow.client`.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### 4. Frontend (Firebase Hosting)
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```
+cd frontend
+npm install
+npm run build
+firebase deploy --only hosting      # project ecoguard-g11-14145
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Local development: `npm run dev` (http://localhost:5173). The Cognito app client allows this URL and the hosted site URL as callback and sign-out URLs.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Security notes
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+- **Authentication:** Cognito ID tokens. API Gateway uses a Cognito authorizer; Cloud Run verifies the JWT itself.
+- **Authorization:** Lambdas take the user from the verified claims (`sub`) and only let a user edit or delete files where `uploaded_by` equals their `sub`.
+- **Least privilege:** each Lambda has its own role scoped to the table, S3 prefixes and actions it needs. For example, the delete function can only call `s3:DeleteObject` on `uploads/*` and `thumbnails/*`, and the lost-pet function can only read `uploads/*`, `thumbnails/*` and read/delete `search-temp/*`. Cloud Run has no AWS credentials, and the browser holds no cloud keys.
+- **Secrets:** none in the repo. Pool ID, region and client ID are public values. `.env*` files and credential files are git-ignored.
+- **Cost control:** two $15 alert-only budgets (AWS and GCP); Cloud Run scales to zero.
 
-## License
-For open source projects, say how it is licensed.
+## Test guide
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### Automated tests
+
+```
+# Cloud Run service
+cd infra/gcp-token-check
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt pytest httpx
+pytest -q
+
+# AWS backend (needs pytest and boto3 installed)
+cd backend
+pytest -q
+```
+
+### Get a token
+
+1. Open the web app, sign in with a test user (create one via the Hosted UI sign-up).
+2. In the browser console run:
+   `Object.keys(sessionStorage).filter(k=>k.startsWith('oidc.user')).map(k=>JSON.parse(sessionStorage[k]).id_token)[0]`
+3. Tokens expire after about an hour. Do not commit or share them.
+
+### Manual checks (PowerShell, use `curl.exe`)
+
+```
+$T = "<id token>"
+$R = "https://ecoguard-api-334103023207.australia-southeast1.run.app"
+curl.exe -s "$R/health"                                   # 200, public
+curl.exe -s -i "$R/me"                                    # 401, no token
+curl.exe -s "$R/me" -H "Authorization: Bearer $T"         # 200, your email
+
+# CORS preflight for DELETE (must list DELETE in access-control-allow-methods)
+curl.exe -s -i -X OPTIONS "https://sn6wpy8jd9.execute-api.ap-southeast-2.amazonaws.com/prod/media/test" -H "Origin: https://ecoguard-g11-14145.web.app" -H "Access-Control-Request-Method: DELETE" -H "Access-Control-Request-Headers: authorization,content-type"
+```
+
+**Cross-user check.** Upload a file as user A and note its `file_id`. As user B, call `DELETE /media/<file_id>` with B's token (`Authorization: <id_token>`). Expected: 403 and the file still exists. With A's token: 200. With no token: 401.
+
+### Demo flow
+
+Sign in, upload an image, wait for thumbnail and tags, search by tag, edit tags in bulk, ask the chatbot "show me foxes", run a lost-pet search, delete a file, check the notification email.
+
+## Team
+
+| Member | Role | Main areas |
+|---|---|---|
+| Member 1 (Cullzn) | Infrastructure and auth | AWS and GCP setup, budgets, Cognito, IAM and security review, Cloud Run deployment, cross-cloud auth, architecture diagram |
+| Member 2 (Josh) | Pipeline and ML | Upload pipeline, thumbnails, Rekognition tagging (`functions/`) |
+| Member 3 (Sarah) | Backend APIs | DynamoDB access, search, bulk tag edit, delete, lost-pet search, notifications (`backend/`) |
+| Member 4 (Chay Hong) | Frontend and chatbot | React app, Firebase Hosting, Dialogflow ES |
+
+## Clean-up after assessment
+
+Delete the `ecoguard-pipeline` and `ecoguard-backend` stacks (empty the S3 bucket first), the Cloud Run service `ecoguard-api`, the Firebase site, and the leftover `ecoguard-cli-test` Cognito app clients and test users.

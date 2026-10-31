@@ -29,7 +29,7 @@ gcloud run deploy ecoguard-api \
   --allow-unauthenticated \
   --min-instances 0 \
   --memory 512Mi --timeout 60 \
-  --set-env-vars COGNITO_REGION=ap-southeast-2,COGNITO_USER_POOL_ID=ap-southeast-2_WI1ngaH1k,COGNITO_APP_CLIENT_ID=5tv0jne3t88vcrc5408vrtnl6s,ALLOWED_ORIGINS=http://localhost:5173
+  --set-env-vars COGNITO_REGION=ap-southeast-2,COGNITO_USER_POOL_ID=ap-southeast-2_WI1ngaH1k,COGNITO_APP_CLIENT_ID=5tv0jne3t88vcrc5408vrtnl6s,ALLOWED_ORIGINS=http://localhost:5173,https://ecoguard-g11-14145.web.app
 ```
 `--allow-unauthenticated` only means Cloud Run itself does not require a Google
 identity. Access is still enforced by the Cognito check in the code, so every
