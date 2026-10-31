@@ -16,7 +16,9 @@ Group 11, FIT3184 Assignment 2. EcoGuard lets people upload photos and videos of
 
 ## Architecture
 
-<!-- Add the exported diagram here once it is in the repo, e.g. docs/architecture/ecoguard-architecture.png -->
+![EcoGuard architecture](docs/architecture/ecoguard-architecture.drawio.png)
+
+The PNG embeds the draw.io source: open `docs/architecture/ecoguard-architecture.drawio.png` in draw.io to edit it.
 
 ```
 Browser (React on Firebase Hosting)
