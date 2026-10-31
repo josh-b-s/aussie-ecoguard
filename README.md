@@ -164,6 +164,22 @@ curl.exe -s -i -X OPTIONS "https://sn6wpy8jd9.execute-api.ap-southeast-2.amazona
 
 **Cross-user check.** Upload a file as user A and note its `file_id`. As user B, call `DELETE /media/<file_id>` with B's token (`Authorization: <id_token>`). Expected: 403 and the file still exists. With A's token: 200. With no token: 401.
 
+### Cross-user security test results
+
+Run on 1 Nov 2026 against the deployed backend API, with two Cognito users (A owns the file, B does not) and a real uploaded photo.
+
+| Test | Expected | Result |
+|---|---|---|
+| `DELETE /media/{file_id}` without a token | 401 | 401 Unauthorized |
+| `DELETE /media/{file_id}` as user B (not the owner) | 403 | 403 "You can only delete your own files." |
+| `DELETE /media/abc` (invalid file ID) | 400 | 400 "Invalid file ID." |
+| `POST /media/tags/bulk` as user B on A's file | 403 | 403 "You can only edit your own files." |
+| `POST /media/tags/bulk` as user A on own file | 200 | 200, tags updated |
+| `DELETE /media/{file_id}` as user A | 200 | 200, file deleted |
+| `DELETE` again as user A | 404 | 404 "File not found." |
+
+Known limitation: a 401 from the API Gateway authorizer carries no CORS header, so a browser shows it as a CORS error rather than a clear sign-in error. API Gateway `GatewayResponses` would fix this.
+
 ### Demo flow
 
 Sign in, upload an image, wait for thumbnail and tags, search by tag, edit tags in bulk, ask the chatbot "show me foxes", run a lost-pet search, delete a file, check the notification email.
