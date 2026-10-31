@@ -282,6 +282,52 @@ Resources:
             Path: /media/search/upload
             Method: post
 
+  
+  LostPetSearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Match missing pets against recent public sightings
+      CodeUri: lost_pet_search/
+      Handler: handler.handler
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+          TEMP_TABLE: !Ref SearchTempTable
+          MATCH_URL: https://ecoguard-api-334103023207.australia-southeast1.run.app/match
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt SearchTempTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/search-temp/*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/uploads/*"
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/thumbnails/*"
+      Events:
+        LostPetSearch:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/search/lost-pet
+            Method: post
+
+
   NotificationsSubscribeFunction:
     Type: AWS::Serverless::Function
     Properties:
