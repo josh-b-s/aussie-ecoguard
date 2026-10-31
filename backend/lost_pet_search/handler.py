@@ -9,13 +9,23 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource("dynamodb")
-s3 = boto3.client("s3")
+
+s3 = boto3.client(
+    "s3",
+    region_name="ap-southeast-2",
+    endpoint_url="https://s3.ap-southeast-2.amazonaws.com",
+    config=Config(
+        signature_version="s3v4",
+        s3={"addressing_style": "virtual"},
+    ),
+)
 
 table = dynamodb.Table(os.environ["TABLE"])
 temp_table = dynamodb.Table(os.environ["TEMP_TABLE"])
@@ -32,6 +42,15 @@ MAX_CANDIDATES = 20
 RECENT_DAYS = 30
 PRESIGNED_URL_EXPIRY = 300
 
+def json_converter(value):
+    """Convert DynamoDB Decimal values for JSON responses."""
+    if isinstance(value, Decimal):
+        return int(value) if value % 1 == 0 else float(value)
+
+    raise TypeError(
+        f"Object of type {type(value).__name__} is not JSON serializable"
+    )
+
 def response(status_code, body):
     """Return a JSON response with frontend CORS headers."""
     return {
@@ -41,7 +60,7 @@ def response(status_code, body):
             "Access-Control-Allow-Origin": FRONTEND_ORIGIN,
             "Vary": "Origin",
         },
-        "body": json.dumps(body),
+        "body": json.dumps(body, default=json_converter),
     }
 
 
@@ -312,13 +331,33 @@ def call_gcp_match(query_url, candidates, id_token):
             )
 
     except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+
+        try:
+            error_data = json.loads(error_body)
+            detail = error_data.get("detail", "")
+
+            if isinstance(detail, str):
+                safe_detail = detail if (
+                    "http" not in detail.lower()
+                    and "token" not in detail.lower()
+                    and len(detail) <= 200
+                ) else "[redacted]"
+            else:
+                safe_detail = "[structured validation error]"
+
+        except (ValueError, AttributeError):
+            safe_detail = "[non-JSON error response]"
+
         logger.error(
-            "GCP matching service returned HTTP %s",
-            exc.code,
-        )
+                "GCP matching service returned HTTP %s; detail: %s",
+                exc.code,
+                safe_detail,
+            )
+
         raise RuntimeError(
-            "GCP matching service rejected the request."
-        ) from exc
+                "GCP matching service rejected the request."
+            ) from exc
 
     except (URLError, TimeoutError) as exc:
         logger.error(
