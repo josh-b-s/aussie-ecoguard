@@ -57,7 +57,7 @@ function Dashboard({ email, idToken }) {
         ) : activeSection === 'Search' ? (
           <Search idToken={idToken} />
         ) : activeSection === 'Lost Pets' ? (
-          <LostPets />
+          <LostPets idToken={idToken} />
         ) : activeSection === 'Notifications' ? (
           <Notifications idToken={idToken} />
         ) : activeSection === 'Chatbot' ? (
