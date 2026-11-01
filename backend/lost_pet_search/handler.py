@@ -76,13 +76,18 @@ def get_authenticated_user(event):
 
 
 def get_bearer_token(event):
-    """Forward the user's Cognito token to GCP."""
+    """Extract the Cognito token from either header format."""
     headers = event.get("headers") or {}
 
     for key, value in headers.items():
         if key.lower() == "authorization":
-            if isinstance(value, str) and value.startswith("Bearer "):
-                return value[7:].strip()
+            if isinstance(value, str):
+                token = value.strip()
+
+                if token.lower().startswith("bearer "):
+                    token = token[7:].strip()
+
+                return token or None
 
     return None
 
