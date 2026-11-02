@@ -48,7 +48,7 @@ Resources:
       Cors:
         AllowOrigin: !Sub "'${FrontendOrigin}'"
         AllowHeaders: "'Content-Type,Authorization'"
-        AllowMethods: "'POST,OPTIONS'"
+        AllowMethods: "'POST,DELETE,OPTIONS'"
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
         AddDefaultAuthorizerToCorsPreflight: false
@@ -114,6 +114,40 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/tags/bulk
             Method: post
+
+  DeleteFileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Delete an owned media file and its thumbnail
+      CodeUri: delete_file/
+      Handler: handler.lambda_handler
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+
+            - Effect: Allow
+              Action:
+                - s3:DeleteObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/uploads/*"
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/thumbnails/*"
+      Events:
+        DeleteFile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/{file_id}
+            Method: delete
    # New Search by Thumbnail Lambda
   SearchThumbnailFunction:
     Type: AWS::Serverless::Function
@@ -247,6 +281,52 @@ Resources:
             RestApiId: !Ref BackendApi
             Path: /media/search/upload
             Method: post
+
+  
+  LostPetSearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Match missing pets against recent public sightings
+      CodeUri: lost_pet_search/
+      Handler: handler.handler
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+          TEMP_TABLE: !Ref SearchTempTable
+          MATCH_URL: https://ecoguard-api-334103023207.australia-southeast1.run.app/match
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt SearchTempTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/search-temp/*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/uploads/*"
+                - !Sub "arn:aws:s3:::${ExistingBucketName}/thumbnails/*"
+      Events:
+        LostPetSearch:
+          Type: Api
+          Properties:
+            RestApiId: !Ref BackendApi
+            Path: /media/search/lost-pet
+            Method: post
+
 
   NotificationsSubscribeFunction:
     Type: AWS::Serverless::Function
